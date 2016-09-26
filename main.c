@@ -16,7 +16,7 @@
 int tests_run = 0;
 
 static char * test_allocateFrame(){
-	ECHOFRAME_PTR fptr = allocateFrame();
+	ECHOFRAME_PTR fptr = allocateFrame(64);
 	mu_assert("frame allocation failed", fptr != NULL);
 	mu_assert("allocated frame size wrong", fptr->allocated == ECHOFRAME_STDSIZE);
 	free(fptr);
