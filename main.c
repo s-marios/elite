@@ -65,8 +65,8 @@ static char * test_initFrame() {
 
 	ECHOFRAME_PTR frame = initFrame(ectrl, ECHOFRAME_STDSIZE, 0);
 	mu_assert("frame init failed", frame != NULL);
-	mu_assert("frame header invalid byte 1", frame->data[0] == E_HID1);
-	mu_assert("frame header invalid byte 1", frame->data[1] == E_HID2);
+	mu_assert("frame header invalid byte 1", frame->data[0] == E_HD1);
+	mu_assert("frame header invalid byte 1", frame->data[1] == E_HD2);
 	printf("getShort result: %d \n", getShort(frame, 2));
 	printf("first four bytes: %x %x %x %x\n", frame->data[0], frame->data[1],
 			frame->data[2], frame->data[3]);
@@ -129,7 +129,7 @@ static char * test_putEOJESV() {
 	putESVnOPC(frame, ESV_SETI);
 	mu_assert("putESVnOPC failed", frame->data[10] == ESV_SETI);
 	mu_assert("frame size is not 12", frame->used == 12);
-	mu_assert("epc number non-zero (1)", frame->data[E_OPC_OFFSET] == 0);
+	mu_assert("epc number non-zero (1)", frame->data[OFF_OPC] == 0);
 	char * data = "data";
 	putEPC(frame, 0x80, 4, data);
 	mu_assert("frame epc counter is not 1", frame->propNum == 1);
@@ -138,9 +138,9 @@ static char * test_putEOJESV() {
 	mu_assert("EPC size is wrong", frame->data[13] == 4);
 	mu_assert("EPC DATA[0] is wrong", frame->data[14] == 'd');
 	mu_assert("EPC_DATA (all) is wrong", memcmp(&frame->data[14], data, 4) == 0);
-	mu_assert("epc number non-zero (1)", frame->data[E_OPC_OFFSET] == 0);
+	mu_assert("epc number non-zero (1)", frame->data[OFF_OPC] == 0);
 	finalizeFrame(frame);
-	mu_assert("frame epc number is wrong", frame->data[E_OPC_OFFSET] == 1);
+	mu_assert("frame epc number is wrong", frame->data[OFF_OPC] == 1);
 
 	dumpFrame(frame);
 
@@ -149,7 +149,56 @@ static char * test_putEOJESV() {
 	return 0;
 }
 
+static char * test_parseFrame(){
+	ECHOCTRL_PTR ectrl = createEchonetControl();
+	ECHOFRAME_PTR frame = initFrame(ectrl, 0, 0);
+	mu_assert("parseFrame: empty frame detection failed", parseFrame(NULL) == PR_NULL);
+	mu_assert("parseFrame: header/tid frame too short detection failed", parseFrame(frame) == PR_TOOSHORT);
+	EOJ eoj;
+	SETEOJ(eoj, 0x01, 0x02, 0x03);
+	//sender
+	putEOJ(frame, eoj);
+	//receiver
+	putEOJ(frame, eoj);
+	mu_assert("parseFrame: eoj frame too short detection failed", parseFrame(frame) == PR_TOOSHORT);
+	putESVnOPC(frame, ESV_GET);
+	mu_assert("parseFrame: ESVOPC frame too short detection failed", parseFrame(frame) == PR_TOOSHORT);
+	putEPC(frame, 0x80, 0, NULL);
+	int result = parseFrame(frame);
+	//printf("parse shortest frame result: %d opc:%d\n", result, frame->propNum);
+	//have not called frame finalizer!
+	mu_assert("parseFrame: opc zero detection failed", result == PR_OPCZERO);
+
+	//shortest frame test
+	finalizeFrame(frame);
+	mu_assert("parseFrame: shortest correct frame length not 14", frame->used == 14);
+	mu_assert("parseFrame: shortest correct frame discarded", parseFrame(frame) == PR_OK);
+	mu_assert("parseFrame: shortest correct frame opc not 1", frame->propNum == 1);
+	//add a few more properties...
+	putEPC(frame, 0x81, 1, "1");
+	putEPC(frame, 0x90, 4, "data");
+	putEPC(frame, 0xFF, 6, "hello!");
+	finalizeFrame(frame);
+	mu_assert("parseFrame: created frame propNum is not 4", frame->propNum == 4);
+	mu_assert("parseFrame: created frame parse not OK", parseFrame(frame));
+	printf("frame size: %d\n", frame->used);
+	mu_assert("parseFrame: created frame lenght not 31", frame->used == 31);
+	free(ectrl);
+	free(frame);
+	return 0;
+}
+
+static char * test_PRINTF(){
+#ifdef ELITE_DEBUG
+	mu_assert("PRINTF: did not print", PRINTF("hello!") == 6);
+#else
+	PRINTF("hello!");
+#endif
+	return 0;
+}
+
 static char * allTests() {
+	mu_run_test(test_PRINTF);
 	mu_run_test(test_malloc1);
 	mu_run_test(test_malloc32);
 	mu_run_test(test_malloc64);
@@ -157,6 +206,8 @@ static char * allTests() {
 	mu_run_test(test_putgetShort);
 	mu_run_test(test_initFrame);
 	mu_run_test(test_putEOJESV);
+	mu_run_test(test_parseFrame);
+
 	return 0;
 }
 

@@ -4,6 +4,17 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/*
+ * Debug printfs
+ */
+//#define ELITE_DEBUG
+
+#ifdef ELITE_DEBUG
+#define PRINTF(x) printf(x)
+#else
+#define PRINTF(x)
+#endif
+
 /**
  * This is the overall control structure for ECHONET Lite operations
  */
@@ -27,6 +38,9 @@ typedef struct {
 #define ECHOFRAME_HEAD(x) (((x)->data[(x)->used]))
 #define ECHOFRAME_STDSIZE 128
 #define ECHOFRAME_MAXSIZE 256
+//frame should be at least 14 bytes or else discarded
+//header (2) + TID (2)+ SDEOJ (6)+ ESVOPC (2) + EPCPDC (2)
+#define ECHOFRAME_MINSIZE 14
 
 typedef enum {
 	ESV_SETI = 0x60,
@@ -47,12 +61,12 @@ typedef enum {
 	ESV_SETGET_SNA = 0x5E
 } ESV;
 
-#define E_HID1 0x10
-#define E_HID2 0x81
+#define E_HD1 0x10
+#define E_HD2 0x81
 
 //offset indexes
-#define E_ESV_OFFSET 10
-#define E_OPC_OFFSET 11
+//#define E_ESV_OFFSET 10
+//#define E_OPC_OFFSET 11
 
 typedef char EOJ[3];
 
@@ -80,5 +94,36 @@ int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, char * data);
 int putESVnOPC(ECHOFRAME_PTR fptr, ESV esv);
 void finalizeFrame(ECHOFRAME_PTR fptr);
 void dumpFrame(ECHOFRAME_PTR fptr);
+
+typedef enum {
+	PR_OK = 1,
+	PR_TOOLONG,
+	PR_TOOSHORT,
+	PR_HD,
+	PR_INVESV,
+	PR_OPCZERO,
+	PR_NULL
+} PARSERESULT;
+
+typedef enum {
+	OFF_EHD1 = 0,
+	OFF_EHD2 = 1,
+	OFF_TID = 2,
+	OFF_SEOJ = 4,
+	OFF_DEOJ = 7,
+	OFF_ESV = 10,
+	OFF_OPC = 11,
+	OFF_EPC = 12
+} OFFSETS;
+
+PARSERESULT parseFrame(ECHOFRAME_PTR fptr);
+
+//this is a parsed EPC, but the name EPC conflicts
+typedef struct {
+	uint8_t propIndex;
+	uint8_t epc;
+	uint8_t pdc;
+	char * edt;
+} PROP, * PROP_PTR;
 
 #endif

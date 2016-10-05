@@ -1,4 +1,5 @@
 #include "elite.h"
+#include <stdio.h>
 #include <malloc.h>
 #include <string.h>
 
@@ -87,13 +88,13 @@ int putESVnOPC(ECHOFRAME_PTR fptr, ESV esv) {
 
 void finalizeFrame(ECHOFRAME_PTR fptr) {
 	//setByteAt function necessary?
-	fptr->data[E_OPC_OFFSET] = fptr->propNum;
+	fptr->data[OFF_OPC] = fptr->propNum;
 }
 
 ECHOFRAME_PTR initFrame(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID) {
 	ECHOFRAME_PTR fptr = allocateFrame(alocsize);
-	putByte(fptr, E_HID1);
-	putByte(fptr, E_HID2);
+	putByte(fptr, E_HD1);
+	putByte(fptr, E_HD2);
 	if (TID == 0) {
 		TID = incTID(cptr);
 	}
@@ -109,11 +110,108 @@ uint16_t getShort(ECHOFRAME_PTR fptr, uint16_t offset) {
 	}
 }
 
-void dumpFrame(ECHOFRAME_PTR fptr){
-	printf("Frame info used, allocated, propNum: %d %d %d\n", fptr->used, fptr->allocated, fptr->propNum);
+void dumpFrame(ECHOFRAME_PTR fptr) {
+	printf("Frame info used, allocated, propNum: %d %d %d\n", fptr->used,
+			fptr->allocated, fptr->propNum);
 	printf("Data: ");
-	for (int i =0; i<fptr->used; i++){
-		printf("\\0x%02x",fptr->data[i]);
+	for (int i = 0; i < fptr->used; i++) {
+		printf("\\0x%02x", fptr->data[i]);
 	}
 	printf("\n");
+}
+
+int isValidESV(uint8_t esv) {
+	switch (esv) {
+	case ESV_SETI:
+	case ESV_SETC:
+	case ESV_GET:
+	case ESV_INFREQ:
+	case ESV_SETGET:
+	case ESV_SETRES:
+	case ESV_GETRES:
+	case ESV_INF:
+	case ESV_INFC:
+	case ESV_INFCRES:
+	case ESV_SETGETRES:
+	case ESV_SETI_SNA:
+	case ESV_SETC_SNA:
+	case ESV_GETC_SNA:
+	case ESV_INF_SNA:
+	case ESV_SETGET_SNA:
+		return 1;
+	}
+	return 0;
+}
+
+PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
+	//basic checks.
+	if (fptr == NULL || fptr->data == NULL) {
+		return PR_NULL;
+	}
+	if (fptr->used < ECHOFRAME_MINSIZE) {
+		return PR_TOOSHORT;
+	}
+	//hard cut-off for big frames
+	if (fptr->used > ECHOFRAME_MAXSIZE) {
+		return PR_TOOLONG;
+	}
+	//check EHD1 & EHD2
+	if (fptr->data[OFF_EHD1] != E_HD1 || fptr->data[OFF_EHD2] != E_HD2) {
+		return PR_HD;
+	}
+	//ignore TID and SEOJ/DEOJ
+	//TODO: check for valid-looking eoj? not sure it's a good idea.
+	if (!isValidESV(fptr->data[OFF_ESV])) {
+		return PR_INVESV;
+	}
+
+	//parsing a property
+	//a relative index into the current location in the frame data
+	uint8_t index = OFF_EPC;
+	uint8_t opc = fptr->data[OFF_OPC];
+	if (opc == 0){
+		return PR_OPCZERO;
+	}
+	PROP epc;
+	memset(&epc, 0, sizeof(PROP));
+	int skipResult = 1;
+	char * curProp = &fptr->data[OFF_EPC];
+	while (skipResult) {
+		//parse data into EPC struct
+		//which property is this? first second etc.
+		epc.propIndex++;
+		//setup the actual property code
+		epc.epc = curProp[0];
+		index++;
+		//setup property data count
+		epc.pdc = curProp[1];
+		index++;
+		//setup property data if it exists.
+		if (epc.pdc != 0) {
+			epc.edt = &curProp[2];
+			index += epc.pdc;
+		}
+		//printf("EPC: 0x%2x %d\n", epc.epc, epc.pdc);
+		//all thing accounted for?
+		if (index < fptr->used) {
+		//	printf("skipped...\n");
+			skipResult = 1;
+		} else if (index == fptr->used) {
+			//did we read all the properties?
+		//	printf("opc propIndex: %d %d", opc, epc.propIndex);
+			if (epc.propIndex == opc) {
+				//everything matches
+				return PR_OK;
+			} else {
+		//		printf("too long...\n");
+				//we were about to read more properties.
+				return PR_TOOLONG;
+			}
+		} else if (index > fptr->used) {
+			return PR_TOOLONG;
+		}
+	}
+
+	//unreachable
+	return PR_OK;
 }
