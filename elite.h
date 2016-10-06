@@ -7,12 +7,16 @@
 /*
  * Debug printfs
  */
-//#define ELITE_DEBUG
+//#define ELITE_DEBUG 2
 
 #ifdef ELITE_DEBUG
-#define PRINTF(x) printf(x)
+#define PRINTF printf
+#if ELITE_DEBUG > 1
+	#define PPRINTF printf
+#endif
 #else
-#define PRINTF(x)
+#define PRINTF
+#define PPRINTF
 #endif
 
 /**
@@ -113,17 +117,22 @@ typedef enum {
 	OFF_DEOJ = 7,
 	OFF_ESV = 10,
 	OFF_OPC = 11,
-	OFF_EPC = 12
+	OFF_EPC = 12,
+	OFF_PDC = 13,
+	OFF_EDT = 14
 } OFFSETS;
 
 PARSERESULT parseFrame(ECHOFRAME_PTR fptr);
 
 //this is a parsed EPC, but the name EPC conflicts
 typedef struct {
+	uint8_t opc;
 	uint8_t propIndex;
 	uint8_t epc;
 	uint8_t pdc;
 	char * edt;
 } PROP, * PROP_PTR;
+
+int getNextEPC(ECHOFRAME_PTR fptr, PROP_PTR epc);
 
 #endif

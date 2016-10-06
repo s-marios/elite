@@ -111,13 +111,13 @@ uint16_t getShort(ECHOFRAME_PTR fptr, uint16_t offset) {
 }
 
 void dumpFrame(ECHOFRAME_PTR fptr) {
-	printf("Frame info used, allocated, propNum: %d %d %d\n", fptr->used,
+	PRINTF("Frame info used, allocated, propNum: %d %d %d\n", fptr->used,
 			fptr->allocated, fptr->propNum);
-	printf("Data: ");
+	PRINTF("Data: ");
 	for (int i = 0; i < fptr->used; i++) {
-		printf("\\0x%02x", fptr->data[i]);
+		PRINTF("\\0x%02x", fptr->data[i]);
 	}
-	printf("\n");
+	PRINTF("\n");
 }
 
 int isValidESV(uint8_t esv) {
@@ -169,13 +169,14 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 	//a relative index into the current location in the frame data
 	uint8_t index = OFF_EPC;
 	uint8_t opc = fptr->data[OFF_OPC];
-	if (opc == 0){
+	if (opc == 0) {
 		return PR_OPCZERO;
 	}
+
 	PROP epc;
 	memset(&epc, 0, sizeof(PROP));
 	int skipResult = 1;
-	char * curProp = &fptr->data[OFF_EPC];
+	char * curProp = &fptr->data[index];
 	while (skipResult) {
 		//parse data into EPC struct
 		//which property is this? first second etc.
@@ -191,27 +192,60 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 			epc.edt = &curProp[2];
 			index += epc.pdc;
 		}
-		//printf("EPC: 0x%2x %d\n", epc.epc, epc.pdc);
+
+		PPRINTF("EPC: 0x%2x %d\n", epc.epc, epc.pdc);
 		//all thing accounted for?
 		if (index < fptr->used) {
-		//	printf("skipped...\n");
+			PPRINTF("readin next prop...\n");
 			skipResult = 1;
+			curProp = &fptr->data[index];
+			continue;
 		} else if (index == fptr->used) {
 			//did we read all the properties?
-		//	printf("opc propIndex: %d %d", opc, epc.propIndex);
+				PPRINTF("opc propIndex: %d %d", opc, epc.propIndex);
 			if (epc.propIndex == opc) {
 				//everything matches
 				return PR_OK;
 			} else {
-		//		printf("too long...\n");
+				PPRINTF("too long but correct number of props...\n");
 				//we were about to read more properties.
 				return PR_TOOLONG;
 			}
 		} else if (index > fptr->used) {
+			PPRINTF("packet parsing too long...\n");
 			return PR_TOOLONG;
 		}
 	}
 
 	//unreachable
 	return PR_OK;
+}
+
+int getNextEPC(ECHOFRAME_PTR fptr, PROP_PTR epc) {
+	//is this an uninitialized epc? get the first property
+	if (epc->propIndex == 0) {
+		//setup total property count
+		epc->opc = fptr->data[OFF_OPC];
+
+		epc->epc = fptr->data[OFF_EPC];
+		epc->pdc = fptr->data[OFF_PDC];
+		epc->edt = &fptr->data[OFF_EDT];
+		epc->propIndex++;
+		return 1;
+	}
+	if (epc->propIndex >= epc->opc) {
+		//this was the last epc we had
+		// > (or we might be lucky to catch an uninitialized one).
+		//cannot do anything more with this.
+		return 0;
+	}
+	//we have a next property, figure out the details here.
+	//this is the base address of the next property.
+	char * nextEPCptr = epc->edt + epc->pdc;
+	//parse the data
+	epc->epc = *nextEPCptr;
+	epc->pdc = *(nextEPCptr +1);
+	epc->edt = nextEPCptr +2;
+	epc->propIndex++;
+	return 1;
 }

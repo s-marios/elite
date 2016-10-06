@@ -17,6 +17,16 @@
 
 int tests_run = 0;
 
+static char * test_PRINTF(){
+#ifdef ELITE_DEBUG
+	mu_assert("PRINTF: did not print", PRINTF("hello!") == 6);
+#else
+	PRINTF("hello!");
+#endif
+	return 0;
+}
+
+
 static char * test_allocateFrame() {
 	ECHOFRAME_PTR fptr = allocateFrame(64);
 	mu_assert("frame allocation failed", fptr != NULL);
@@ -176,26 +186,66 @@ static char * test_parseFrame(){
 	mu_assert("parseFrame: shortest correct frame opc not 1", frame->propNum == 1);
 	//add a few more properties...
 	putEPC(frame, 0x81, 1, "1");
+	finalizeFrame(frame);
+
+	dumpFrame(frame);
+	mu_assert("parseFrame: created frame parse not OK (1)", parseFrame(frame) == PR_OK);
+
 	putEPC(frame, 0x90, 4, "data");
+	finalizeFrame(frame);
+	mu_assert("parseFrame: created frame parse not OK (2)", parseFrame(frame) == PR_OK);
+
 	putEPC(frame, 0xFF, 6, "hello!");
 	finalizeFrame(frame);
+	mu_assert("parseFrame: created frame parse not OK (3)", parseFrame(frame) == PR_OK);
+
 	mu_assert("parseFrame: created frame propNum is not 4", frame->propNum == 4);
-	mu_assert("parseFrame: created frame parse not OK", parseFrame(frame));
 	printf("frame size: %d\n", frame->used);
 	mu_assert("parseFrame: created frame lenght not 31", frame->used == 31);
+	mu_assert("parseFrame: created frame parse not OK", parseFrame(frame) == PR_OK);
 	free(ectrl);
 	free(frame);
 	return 0;
 }
 
-static char * test_PRINTF(){
-#ifdef ELITE_DEBUG
-	mu_assert("PRINTF: did not print", PRINTF("hello!") == 6);
-#else
-	PRINTF("hello!");
-#endif
+static char * test_getNextEPC(){
+
+	ECHOCTRL_PTR ectrl = createEchonetControl();
+	ECHOFRAME_PTR frame = initFrame(ectrl, 0, 0);
+	EOJ eoj;
+	SETEOJ(eoj, 0x01, 0x02, 0x03);
+	putEOJ(frame, eoj);
+	putEOJ(frame, eoj);
+	putESVnOPC(frame, ESV_SETI);
+	static char * data [] = {"1", "22", "333", "4444"};
+	static uint8_t propcodes [] = {0x80, 0x81, 0x82, 0x83};
+	for (int i=0; i<4; i++){
+		putEPC(frame, propcodes[i], i+1, data[i]);
+	}
+//	putEPC(frame, 0x80, 1, "1");
+//	putEPC(frame, 0x81, 2, "22");
+//	putEPC(frame, 0x82, 3, "333");
+//	putEPC(frame, 0x83, 4, "4444");
+	finalizeFrame(frame);
+	mu_assert("getNextEPC: frame parsing failed", parseFrame(frame) == PR_OK);
+	PROP_PTR prop_ptr = malloc(sizeof(PROP));
+	memset(prop_ptr, 0, sizeof(PROP));
+
+	int i = 0;
+	while (getNextEPC(frame, prop_ptr)){
+		printf("getNextEPC repetition: %d\n", i );
+		mu_assert("getNextEPC epc not match", prop_ptr->epc == propcodes[i]);
+		mu_assert("getNextEPC pdc not match", prop_ptr->pdc == i+1);
+		mu_assert("getNextEPC edt not match", memcmp(prop_ptr->edt, data[i], prop_ptr->pdc) == 0);
+		i++;
+	}
+
+	free(ectrl);
+	free(frame);
+	free(prop_ptr);
 	return 0;
 }
+
 
 static char * allTests() {
 	mu_run_test(test_PRINTF);
@@ -207,7 +257,7 @@ static char * allTests() {
 	mu_run_test(test_initFrame);
 	mu_run_test(test_putEOJESV);
 	mu_run_test(test_parseFrame);
-
+	mu_run_test(test_getNextEPC);
 	return 0;
 }
 
