@@ -81,6 +81,7 @@ typedef char EOJ[3];
 #define GETSUPERCLASS(x) ((x)[0])
 #define GETCLASS(x) ((x)[1])
 #define GETINSTANCE(x) ((x)[2])
+#define CMPEOJ(x, y) memcmp(x, y, 3)
 
 ECHOFRAME_PTR allocateFrame(size_t alocsize);
 ECHOFRAME_PTR initFrame(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t EID);
@@ -134,5 +135,10 @@ typedef struct {
 } PROP, * PROP_PTR;
 
 int getNextEPC(ECHOFRAME_PTR fptr, PROP_PTR epc);
+#define getTID(x) getShort(x, OFF_TID)
+#define getSEOJ(x) &x->data[OFF_SEOJ]
+#define getDEOJ(x) &x->data[OFF_DEOJ]
+#define getESV(x) x->data[OFF_ESV]
+#define getOPC(x) x->data[OFF_OPC]
 
 #endif

@@ -102,6 +102,8 @@ static char * test_putEOJESV() {
 
 	mu_assert("after initFrame :frame epc counter not zero", frame->propNum == 0);
 
+	mu_assert("getTID failed", getTID(frame) == 1);
+
 	EOJ seoj;
 	SETSUPERCLASS(seoj, 0x01);
 	SETCLASS(seoj, 0x02);
@@ -136,10 +138,16 @@ static char * test_putEOJESV() {
 
 	mu_assert("before ESVnOPC :frame epc counter: %d\n", frame->propNum == 0);
 
+	mu_assert("CMPEOJ: different eoj are same", CMPEOJ(seoj, deoj) != 0);
+	mu_assert("getSEOJ failed", CMPEOJ(seoj, getSEOJ(frame)) == 0);
+	mu_assert("getDEOJ failed", CMPEOJ(deoj, getDEOJ(frame)) == 0);
+
 	putESVnOPC(frame, ESV_SETI);
 	mu_assert("putESVnOPC failed", frame->data[10] == ESV_SETI);
+	mu_assert("getESV failed", getESV(frame) == ESV_SETI);
 	mu_assert("frame size is not 12", frame->used == 12);
 	mu_assert("epc number non-zero (1)", frame->data[OFF_OPC] == 0);
+	mu_assert("getOPC failed (1)", getOPC(frame) == 0);
 	char * data = "data";
 	putEPC(frame, 0x80, 4, data);
 	mu_assert("frame epc counter is not 1", frame->propNum == 1);
@@ -150,8 +158,8 @@ static char * test_putEOJESV() {
 	mu_assert("EPC_DATA (all) is wrong", memcmp(&frame->data[14], data, 4) == 0);
 	mu_assert("epc number non-zero (1)", frame->data[OFF_OPC] == 0);
 	finalizeFrame(frame);
-	mu_assert("frame epc number is wrong", frame->data[OFF_OPC] == 1);
-
+	mu_assert("frame opc number is wrong", frame->data[OFF_OPC] == 1);
+	mu_assert("getOPC failed (2)", getOPC(frame) == 1);
 	dumpFrame(frame);
 
 	free(ectrl);
