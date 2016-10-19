@@ -13,6 +13,7 @@
 #include "esp/gpio.h"
 #include "elite.h"
 #include "minunit.h"
+#include "macrolist.h"
 //#include "gdbstub.h"
 
 int tests_run = 0;
@@ -254,6 +255,51 @@ static char * test_getNextEPC(){
 	return 0;
 }
 
+static char * test_MLISTS(){
+	int num = 4;
+	OBJ_PTR object_p = malloc(sizeof(OBJ)*num);
+	memset(object_p, 0, sizeof(OBJ)*num);
+
+	OBJ_PTR p1 = object_p +1;
+	p1->i = 1;
+	OBJ_PTR p2 = p1 +1;
+	p2->i = 2;
+	mu_assert("empty head has next", LHASNEXT(object_p) == NULL);
+	LAPPEND(object_p, p1);
+	PRINTF("object_p->next is: %s\n", object_p ? "true" : "false");
+	mu_assert("next field not adjusted properly", object_p->next == p1);
+	mu_assert("p1->next is not null", p1->next == NULL);
+	mu_assert("p1 i is not 1 (1)", p1->i==1);
+	LAPPEND(object_p, p2);
+	mu_assert("object_p->next changed", object_p->next == p1);
+
+	FOREACHPURE(object_p){
+		OBJ_PTR tobj = (OBJ_PTR) element;
+		PRINTF("test next empty? %s\n", tobj->next ? "false" : "true");
+	}
+
+	FOREACH(object_p, OBJ_PTR){
+		PRINTF("elem i: %d, next empty? %s\n", element->i, element->next ? "false" : "true");
+	}
+
+	PRINTF("p1->next: %d, p2: %d\n", p1->next, p2);
+	PRINTF("p1 i: %d, p2 i: %d\n", p1->i, p2->i);
+	mu_assert("p1 i not 1 (2)", p1->i == 1);
+	mu_assert("p2_i not 2", p2->i == 2);
+	mu_assert("p1 next field not correct" , p1->next == p2);
+
+	OBJ_PTR p4 = object_p +3;
+	p4->i = 4;
+	LPREPEND(object_p, p4);
+	FOREACH(object_p, OBJ_PTR){
+		PRINTF("elem i: %d, next empty? %s\n", element->i, element->next ? "false" : "true");
+	}
+	mu_assert("LPREPEND did not update head", object_p == p4);
+
+	free(object_p);
+	return 0;
+}
+
 
 static char * allTests() {
 	mu_run_test(test_PRINTF);
@@ -266,6 +312,7 @@ static char * allTests() {
 	mu_run_test(test_putEOJESV);
 	mu_run_test(test_parseFrame);
 	mu_run_test(test_getNextEPC);
+	mu_run_test(test_MLISTS);
 	return 0;
 }
 
