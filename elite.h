@@ -132,13 +132,21 @@ typedef struct {
 	uint8_t epc;
 	uint8_t pdc;
 	char * edt;
-} PROP, * PROP_PTR;
+} PARSE_EPC, * PARSE_EPC_PTR;
 
-int getNextEPC(ECHOFRAME_PTR fptr, PROP_PTR epc);
+int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 #define getTID(x) getShort(x, OFF_TID)
 #define getSEOJ(x) &x->data[OFF_SEOJ]
 #define getDEOJ(x) &x->data[OFF_DEOJ]
 #define getESV(x) x->data[OFF_ESV]
 #define getOPC(x) x->data[OFF_OPC]
+
+typedef struct {
+
+} Property, Property_PTR;
+
+typedef struct {
+
+} OBJ, * OBJ_PTR;
 
 #endif

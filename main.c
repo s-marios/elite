@@ -236,8 +236,8 @@ static char * test_getNextEPC(){
 //	putEPC(frame, 0x83, 4, "4444");
 	finalizeFrame(frame);
 	mu_assert("getNextEPC: frame parsing failed", parseFrame(frame) == PR_OK);
-	PROP_PTR prop_ptr = malloc(sizeof(PROP));
-	memset(prop_ptr, 0, sizeof(PROP));
+	PARSE_EPC_PTR prop_ptr = malloc(sizeof(PARSE_EPC));
+	memset(prop_ptr, 0, sizeof(PARSE_EPC));
 
 	int i = 0;
 	while (getNextEPC(frame, prop_ptr)){

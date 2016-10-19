@@ -173,8 +173,8 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 		return PR_OPCZERO;
 	}
 
-	PROP epc;
-	memset(&epc, 0, sizeof(PROP));
+	PARSE_EPC epc;
+	memset(&epc, 0, sizeof(PARSE_EPC));
 	int skipResult = 1;
 	char * curProp = &fptr->data[index];
 	while (skipResult) {
@@ -221,7 +221,7 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 	return PR_OK;
 }
 
-int getNextEPC(ECHOFRAME_PTR fptr, PROP_PTR epc) {
+int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc) {
 	//is this an uninitialized epc? get the first property
 	if (epc->propIndex == 0) {
 		//setup total property count
