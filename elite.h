@@ -7,18 +7,19 @@
 /*
  * Debug printfs
  */
-//#define ELITE_DEBUG 2
+#define ELITE_DEBUG 1
 
-#ifdef ELITE_DEBUG
-#define PRINTF printf
-#if ELITE_DEBUG > 1
-	#define PPRINTF printf
-#endif
-#else
 #define PRINTF
 #define PPRINTF
-#endif
 
+#ifdef ELITE_DEBUG
+#undef PRINTF
+#define PRINTF printf
+	#if ELITE_DEBUG > 1
+		#undef PPRINTF
+		#define PPRINTF printf
+	#endif
+#endif
 /**
  * This is the overall control structure for ECHONET Lite operations
  */
@@ -142,11 +143,12 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 #define getOPC(x) x->data[OFF_OPC]
 
 typedef struct {
-
+	void * next;
 } Property, Property_PTR;
 
 typedef struct {
-
+	void * next;
+	int i;
 } OBJ, * OBJ_PTR;
 
 #endif
