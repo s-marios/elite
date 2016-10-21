@@ -31,6 +31,6 @@ typedef struct {
 
 #define FOREACHPURE(head) for (ELEMENT_PTR element = (ELEMENT_PTR) head; element; element = element->next)
 #define FOREACH(head, type) for (type element = head; element; element = (type) ((ELEMENT_PTR) element)->next)
-
+#define FOREACHWITH(head, type, name) for (type name = head; name; name = (type) (ELEMENT_PTR) name->next)
 //file end
 #endif

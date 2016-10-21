@@ -3,10 +3,6 @@
 #include <malloc.h>
 #include <string.h>
 
-size_t test(void) {
-	return 4;
-}
-
 ECHOFRAME_PTR allocateFrame(size_t alocsize) {
 	if (alocsize <= 0 || alocsize > ECHOFRAME_MAXSIZE) {
 		alocsize = ECHOFRAME_STDSIZE;
@@ -202,7 +198,7 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 			continue;
 		} else if (index == fptr->used) {
 			//did we read all the properties?
-				PPRINTF("opc propIndex: %d %d", opc, epc.propIndex);
+			PPRINTF("opc propIndex: %d %d", opc, epc.propIndex);
 			if (epc.propIndex == opc) {
 				//everything matches
 				return PR_OK;
@@ -244,8 +240,164 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc) {
 	char * nextEPCptr = epc->edt + epc->pdc;
 	//parse the data
 	epc->epc = *nextEPCptr;
-	epc->pdc = *(nextEPCptr +1);
-	epc->edt = nextEPCptr +2;
+	epc->pdc = *(nextEPCptr + 1);
+	epc->edt = nextEPCptr + 2;
 	epc->propIndex++;
 	return 1;
+}
+
+int readProperty(Property_PTR property, uint8_t size, char * buf) {
+	if (property == NULL || property->read == NULL) {
+		return -1;
+	} else if (buf == NULL) {
+		return -2;
+	} else {
+		return property->read(property, size, buf);
+	}
+}
+
+int writeProperty(Property_PTR property, uint8_t size, char * buf) {
+	if (property == NULL || property->write == NULL) {
+		return -1;
+	} else if (buf == NULL) {
+		return -2;
+	} else {
+		return property->write(property, size, buf);
+	}
+}
+
+int testRead(Property_PTR property, uint8_t size, char * buf) {
+	memcpy(buf, "test", 4);
+	return 4;
+}
+
+void freeProperty(Property_PTR property) {
+	if (property == NULL) {
+		return;
+	}
+	if (property->freeptr) {
+		property->freeptr(property);
+		return;
+	} else {
+		//Default destructor
+		//Frees the optional pointer and then the property itself.
+		if (property->opt != NULL) {
+			free(property->opt);
+			property->opt = NULL;
+		}
+		free(property);
+	}
+}
+
+void initTestProperty(Property_PTR property) {
+	if (property == NULL)
+		return;
+	memset(property, 0, sizeof(Property));
+	property->propcode = 0x80;
+	property->read = testRead;
+}
+
+typedef struct {
+	uint8_t maxsize;
+	uint8_t used;
+	char * data;
+} DATABUFFER, *DATABUFFER_PTR;
+
+//read function for a "data property"
+int readData(Property_PTR property, uint8_t size, char * buf) {
+	DATABUFFER_PTR databuffer = (DATABUFFER_PTR) property->opt;
+	if (databuffer->used > size) {
+		return 0;
+	} else {
+		memcpy(buf, &databuffer->data, databuffer->used);
+		return databuffer->used;
+	}
+}
+
+//write function for a "data property"
+int writeData(Property_PTR property, uint8_t size, char * buf) {
+	DATABUFFER_PTR databuffer = (DATABUFFER_PTR) property->opt;
+	if (size > databuffer->maxsize) {
+		return 0;
+	} else {
+		memcpy(&databuffer->data, buf, size);
+		databuffer->used = size;
+		return size;
+	}
+}
+
+int writeDataExact(Property_PTR property, uint8_t size, char * buf) {
+	DATABUFFER_PTR databuffer = (DATABUFFER_PTR) property->opt;
+	if (size != databuffer->maxsize) {
+		return 0;
+	} else {
+		memcpy(&databuffer->data, buf, size);
+		databuffer->used = size;
+		return size;
+	}
+}
+
+Property_PTR createProperty(uint8_t propcode, uint8_t mode) {
+	Property_PTR property = malloc(sizeof(Property));
+	if (property == NULL) {
+		return NULL;
+	}
+	//we have the basic property, memzero everything
+	//we also use the default destructor
+	memset(property, 0, sizeof(Property));
+	property->rwn_mode = mode;
+	property->propcode = propcode;
+	return property;
+}
+
+Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
+		uint8_t datasize, char * data) {
+	Property_PTR property = createProperty(propcode, rwn);
+	if (property == NULL) {
+		return NULL;
+	}
+
+	//check if maxSize is less than data size, and BAIL
+	if (datasize > maxsize) {
+		freeProperty(property);
+		return NULL;
+	}
+
+	//init the space for the databuffer and the data;
+	property->opt = malloc(sizeof(DATABUFFER) + maxsize);
+	if (property->opt == NULL) {
+		//somehow we failed. bail out
+		free(property);
+		return NULL;
+	}
+
+
+	//copy the incoming data
+	DATABUFFER_PTR databuffer = (DATABUFFER_PTR) property->opt;
+	databuffer->maxsize = maxsize;
+	databuffer->used = datasize;
+
+	if (datasize > 0 && data != NULL) {
+		//copy the data into the buffer
+		memcpy(&databuffer->data, data, databuffer->used);
+	} else {
+		//just clear the data space
+		memset(&databuffer->data, 0, databuffer->maxsize);
+	}
+
+	//setup the read write accessors
+	if (rwn & E_WRITE) {
+		if (datasize < maxsize) {
+			property->write = writeData;
+		} else if (datasize == maxsize) {
+			property->write = writeDataExact;
+		}
+	}
+	if (rwn & E_READ) {
+		property->read = readData;
+	}
+	if (rwn & E_NOTIFY) {
+		//TODO, what do we do about notifications?!
+	}
+	return property;
 }

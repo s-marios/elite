@@ -15,10 +15,10 @@
 #ifdef ELITE_DEBUG
 #undef PRINTF
 #define PRINTF printf
-	#if ELITE_DEBUG > 1
-		#undef PPRINTF
-		#define PPRINTF printf
-	#endif
+#if ELITE_DEBUG > 1
+#undef PPRINTF
+#define PPRINTF printf
+#endif
 #endif
 /**
  * This is the overall control structure for ECHONET Lite operations
@@ -102,13 +102,7 @@ void finalizeFrame(ECHOFRAME_PTR fptr);
 void dumpFrame(ECHOFRAME_PTR fptr);
 
 typedef enum {
-	PR_OK = 1,
-	PR_TOOLONG,
-	PR_TOOSHORT,
-	PR_HD,
-	PR_INVESV,
-	PR_OPCZERO,
-	PR_NULL
+	PR_OK = 1, PR_TOOLONG, PR_TOOSHORT, PR_HD, PR_INVESV, PR_OPCZERO, PR_NULL
 } PARSERESULT;
 
 typedef enum {
@@ -133,7 +127,7 @@ typedef struct {
 	uint8_t epc;
 	uint8_t pdc;
 	char * edt;
-} PARSE_EPC, * PARSE_EPC_PTR;
+} PARSE_EPC, *PARSE_EPC_PTR;
 
 int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 #define getTID(x) getShort(x, OFF_TID)
@@ -142,13 +136,44 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 #define getESV(x) x->data[OFF_ESV]
 #define getOPC(x) x->data[OFF_OPC]
 
-typedef struct {
+//this is essentially forward declaration for the property struct
+typedef struct Property Property;
+typedef struct Property * Property_PTR;
+typedef int (*READWRITE)(Property_PTR property, uint8_t size, char * buf);
+typedef void (*FREE)(Property_PTR property);
+
+struct Property {
 	void * next;
-} Property, Property_PTR;
+	void * opt;
+	FREE freeptr;
+	READWRITE read;
+	READWRITE write;
+	uint8_t propcode;
+	uint8_t rwn_mode;
+};
 
 typedef struct {
 	void * next;
 	int i;
-} OBJ, * OBJ_PTR;
+} OBJ, *OBJ_PTR;
+
+
+
+int readProperty(Property_PTR property, uint8_t size, char * buf);
+int writeProperty(Property_PTR property, uint8_t size, char * buf);
+
+void freeProperty(Property_PTR property);
+Property_PTR createProperty(uint8_t propcode, uint8_t mode);
+
+typedef enum {
+	E_READ = 1, E_WRITE = 2, E_NOTIFY = 4,
+} E_WRITEMODE;
+
+Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
+		uint8_t dataSize, char * data);
+
+//for some testing
+int testRead(Property_PTR property, uint8_t size, char * buf);
+void initTestProperty(Property_PTR property);
 
 #endif
