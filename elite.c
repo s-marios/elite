@@ -1,7 +1,9 @@
-#include "elite.h"
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
+
+#include "elite.h"
+#include "macrolist.h"
 
 ECHOFRAME_PTR allocateFrame(size_t alocsize) {
 	if (alocsize <= 0 || alocsize > ECHOFRAME_MAXSIZE) {
@@ -246,6 +248,15 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc) {
 	return 1;
 }
 
+OBJ_PTR createObject(char * eoj) {
+	OBJ_PTR obj = malloc(sizeof(OBJ));
+	if (obj == NULL) {
+		return 0;
+	}
+	memcpy(obj->eoj, eoj, 3);
+	return obj;
+}
+
 int readProperty(Property_PTR property, uint8_t size, char * buf) {
 	if (property == NULL || property->read == NULL) {
 		return -1;
@@ -401,3 +412,95 @@ Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 	}
 	return property;
 }
+
+/**
+ * Flips the corresponding bit in the property bit map.
+ *
+ * This is used in type-2 (binary) property map format.
+ *
+ * param code the property code
+ * param pbitmap the property bitmap to be manipulated
+ */
+void flipPropertyBit(uint8_t code, char * pbitmap) {
+	//high nibble specifies the bit to flip through shifting
+	//low nibble is the byte in which to flip
+	uint8_t highnibble, lownibble;
+	//zero-th byte is property count
+	lownibble = (code & 0x0F) + 1;
+	highnibble = code >> 4;
+	//also subtract 0x08 from highnibble
+	highnibble -= 0x08;
+
+	//flip the bit
+	pbitmap[lownibble] |= 0x01 << highnibble;
+}
+
+int computeListMaps(OBJ_PTR obj, char * maps);
+int computeBinaryMaps(OBJ_PTR obj, char * maps);
+
+int computePropertyMaps(OBJ_PTR obj) {
+	//in order: notify, set, get rawmaps
+	char * rawmaps = malloc(3 * 17);
+	if (rawmaps == NULL) {
+		PRINTF("run out of memory.");
+		return -1;
+	}
+	//first, count the properties to decide the format
+	int count = 0;
+	Property_PTR pHead = obj->properties;
+	FOREACHPURE(pHead)
+	{
+		count++;
+	}
+
+	if (count < 16) {
+		//TODO simpe bytes
+		return computeListMaps(obj, rawmaps);
+	} else {
+		//TODO bitflips
+		return computeBinaryMaps(obj, rawmaps);
+	}
+	return 0;
+}
+
+#define MAPOFF_N 0
+#define MAPOFF_S 17
+#define MAPOFF_G 34
+int computeListMaps(OBJ_PTR obj, char * maps) {
+	FOREACH(obj->properties, Property_PTR)
+	{
+		if (element->rwn_mode & E_NOTIFY) {
+			//maps[MAPOFF_N]++; preincrement
+			maps[MAPOFF_N + (++maps[MAPOFF_N])] = element->propcode;
+		}
+		if (element->rwn_mode & E_WRITE) {
+			//maps[MAPOFF_S]++; preincrement
+			maps[MAPOFF_S + (++maps[MAPOFF_S])] = element->propcode;
+		}
+		if (element->rwn_mode & E_READ) {
+			//maps[MAPOFF_G]++; preincrement
+			maps[MAPOFF_G + (++maps[MAPOFF_G])] = element->propcode;
+		}
+	}
+	return 0;
+}
+
+int computeBinaryMaps(OBJ_PTR obj, char * maps) {
+	FOREACH(obj->properties, Property_PTR)
+	{
+		if (element->rwn_mode & E_NOTIFY) {
+			maps[MAPOFF_N]++;
+			flipPropertyBit(element->propcode, &maps[MAPOFF_N]);
+		}
+		if (element->rwn_mode & E_WRITE) {
+			maps[MAPOFF_S]++;
+			flipPropertyBit(element->propcode, &maps[MAPOFF_S]);
+		}
+		if (element->rwn_mode & E_READ) {
+			maps[MAPOFF_G]++;
+			flipPropertyBit(element->propcode, &maps[MAPOFF_G]);
+		}
+	}
+	return 0;
+}
+

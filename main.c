@@ -392,6 +392,10 @@ static char * test_testDataProperty() {
 	return 0;
 }
 
+static char * test_PropertyMaps() {
+	return 0;
+}
+
 static char * allTests() {
 	mu_run_test(test_PRINTF);
 	mu_run_test(test_malloc1);
@@ -406,6 +410,7 @@ static char * allTests() {
 	mu_run_test(test_MLISTS);
 	mu_run_test(test_testProperty);
 	mu_run_test(test_testDataProperty);
+	mu_run_test(test_PropertyMaps);
 	return 0;
 }
 

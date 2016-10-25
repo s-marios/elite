@@ -142,6 +142,11 @@ typedef struct Property * Property_PTR;
 typedef int (*READWRITE)(Property_PTR property, uint8_t size, char * buf);
 typedef void (*FREE)(Property_PTR property);
 
+typedef enum {
+	E_READ = 1, E_WRITE = 2, E_NOTIFY = 4,
+} E_WRITEMODE;
+
+
 struct Property {
 	void * next;
 	void * opt;
@@ -152,12 +157,21 @@ struct Property {
 	uint8_t rwn_mode;
 };
 
+#define classgroup eoj[0]
+#define class eoj[1]
+#define instance eoj[2]
+
 typedef struct {
 	void * next;
-	int i;
+	int i; /*!< this was used for tests */
+	Property_PTR properties;
+	uint8_t eoj[3];
 } OBJ, *OBJ_PTR;
 
-
+OBJ_PTR createObject(char * eoj);
+#define setClassGroup(obj_ptr, val) (obj_ptr)->classgroup = val
+#define setClass(obj_ptr, val) (obj_ptr)->class = val
+#define setInstance(obj_ptr, val) (obj_ptr)->instance = val
 
 int readProperty(Property_PTR property, uint8_t size, char * buf);
 int writeProperty(Property_PTR property, uint8_t size, char * buf);
@@ -165,15 +179,20 @@ int writeProperty(Property_PTR property, uint8_t size, char * buf);
 void freeProperty(Property_PTR property);
 Property_PTR createProperty(uint8_t propcode, uint8_t mode);
 
-typedef enum {
-	E_READ = 1, E_WRITE = 2, E_NOTIFY = 4,
-} E_WRITEMODE;
-
 Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 		uint8_t dataSize, char * data);
+
+
 
 //for some testing
 int testRead(Property_PTR property, uint8_t size, char * buf);
 void initTestProperty(Property_PTR property);
+
+void flipPropertyBit(uint8_t code, char * pbitmap);
+/**
+ * This function computes the property maps for this object and
+ * adds the corresponding properties (9d,9e,9f) to it.
+ */
+int computePropertyMaps(OBJ_PTR obj);
 
 #endif
