@@ -140,17 +140,18 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 typedef struct Property Property;
 typedef struct Property * Property_PTR;
 typedef int (*READWRITE)(Property_PTR property, uint8_t size, char * buf);
-typedef void (*FREE)(Property_PTR property);
+typedef Property_PTR (*FREEFUNC)(Property_PTR property);
+
+#define FREE(aptr) aptr->freeptr(aptr)
 
 typedef enum {
 	E_READ = 1, E_WRITE = 2, E_NOTIFY = 4,
 } E_WRITEMODE;
 
-
 struct Property {
 	void * next;
 	void * opt;
-	FREE freeptr;
+	FREEFUNC freeptr;
 	READWRITE read;
 	READWRITE write;
 	uint8_t propcode;
@@ -164,7 +165,7 @@ struct Property {
 typedef struct {
 	void * next;
 	int i; /*!< this was used for tests */
-	Property_PTR properties;
+	Property_PTR pHead;
 	uint8_t eoj[3];
 } OBJ, *OBJ_PTR;
 
@@ -176,13 +177,28 @@ OBJ_PTR createObject(char * eoj);
 int readProperty(Property_PTR property, uint8_t size, char * buf);
 int writeProperty(Property_PTR property, uint8_t size, char * buf);
 
-void freeProperty(Property_PTR property);
+/**
+ * Frees a property.
+ *
+ * It will try to invoke the custom free function if present, else it will
+ * perform default clean up actions and return the next property, if present.
+ * Use FREEPROPERTIES to delete a list of properties in a single setp. Does
+ * NOT work with FOREACH.
+ *
+ * @param proeprty the property to be freed
+ * @return the address of the next property or NULL if not present
+ */
+Property_PTR freeProperty(Property_PTR property);
+#define FREEPROPERTIES(head) while(head){head = freeProperty(head);}
 Property_PTR createProperty(uint8_t propcode, uint8_t mode);
 
+/**
+ * Creates a pure data property that stores data.
+ */
 Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 		uint8_t dataSize, char * data);
 
-
+int compareProperties(void * prop, void * other);
 
 //for some testing
 int testRead(Property_PTR property, uint8_t size, char * buf);

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
+#include <limits.h>
 
 #include "elite.h"
 #include "macrolist.h"
@@ -253,7 +254,10 @@ OBJ_PTR createObject(char * eoj) {
 	if (obj == NULL) {
 		return 0;
 	}
-	memcpy(obj->eoj, eoj, 3);
+	memset(obj, 0, sizeof(OBJ));
+	if (eoj) {
+		memcpy(obj->eoj, eoj, 3);
+	}
 	return obj;
 }
 
@@ -282,13 +286,13 @@ int testRead(Property_PTR property, uint8_t size, char * buf) {
 	return 4;
 }
 
-void freeProperty(Property_PTR property) {
+Property_PTR freeProperty(Property_PTR property) {
 	if (property == NULL) {
-		return;
+		return NULL;
 	}
+	Property_PTR next = property->next;
 	if (property->freeptr) {
 		property->freeptr(property);
-		return;
 	} else {
 		//Default destructor
 		//Frees the optional pointer and then the property itself.
@@ -298,6 +302,34 @@ void freeProperty(Property_PTR property) {
 		}
 		free(property);
 	}
+	return next;
+}
+
+Property_PTR createProperty(uint8_t propcode, uint8_t mode) {
+	Property_PTR property = malloc(sizeof(Property));
+	if (property == NULL) {
+		return NULL;
+	}
+	//we have the basic property, memzero everything
+	//we also use the default destructor
+	memset(property, 0, sizeof(Property));
+	property->rwn_mode = mode;
+	property->propcode = propcode;
+	return property;
+}
+
+int compareProperties(void * prop, void * other) {
+	if (prop == other) {
+		return 0;
+	}
+	if (prop == NULL) {
+		return INT_MIN;
+	} else if (other == NULL) {
+		return INT_MAX;
+	}
+	Property_PTR property = (Property_PTR) prop;
+	Property_PTR o = (Property_PTR) other;
+	return property->propcode - o->propcode;
 }
 
 void initTestProperty(Property_PTR property) {
@@ -348,19 +380,6 @@ int writeDataExact(Property_PTR property, uint8_t size, char * buf) {
 	}
 }
 
-Property_PTR createProperty(uint8_t propcode, uint8_t mode) {
-	Property_PTR property = malloc(sizeof(Property));
-	if (property == NULL) {
-		return NULL;
-	}
-	//we have the basic property, memzero everything
-	//we also use the default destructor
-	memset(property, 0, sizeof(Property));
-	property->rwn_mode = mode;
-	property->propcode = propcode;
-	return property;
-}
-
 Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 		uint8_t datasize, char * data) {
 	Property_PTR property = createProperty(propcode, rwn);
@@ -381,7 +400,6 @@ Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 		free(property);
 		return NULL;
 	}
-
 
 	//copy the incoming data
 	DATABUFFER_PTR databuffer = (DATABUFFER_PTR) property->opt;
@@ -447,8 +465,7 @@ int computePropertyMaps(OBJ_PTR obj) {
 	}
 	//first, count the properties to decide the format
 	int count = 0;
-	Property_PTR pHead = obj->properties;
-	FOREACHPURE(pHead)
+	FOREACHPURE(obj->pHead)
 	{
 		count++;
 	}
@@ -467,7 +484,7 @@ int computePropertyMaps(OBJ_PTR obj) {
 #define MAPOFF_S 17
 #define MAPOFF_G 34
 int computeListMaps(OBJ_PTR obj, char * maps) {
-	FOREACH(obj->properties, Property_PTR)
+	FOREACH(obj->pHead, Property_PTR)
 	{
 		if (element->rwn_mode & E_NOTIFY) {
 			//maps[MAPOFF_N]++; preincrement
@@ -486,7 +503,7 @@ int computeListMaps(OBJ_PTR obj, char * maps) {
 }
 
 int computeBinaryMaps(OBJ_PTR obj, char * maps) {
-	FOREACH(obj->properties, Property_PTR)
+	FOREACH(obj->pHead, Property_PTR)
 	{
 		if (element->rwn_mode & E_NOTIFY) {
 			maps[MAPOFF_N]++;

@@ -392,7 +392,120 @@ static char * test_testDataProperty() {
 	return 0;
 }
 
-static char * test_PropertyMaps() {
+static char * test_freePropertyAndEOJ() {
+	char anEoj[] = { 0, 1, 1 };
+	OBJ_PTR obj = createObject("\x00\x01\x01");
+	mu_assert("object eoj not set properly", memcmp(obj->eoj, anEoj, 3) == 0);
+	mu_assert("object: classgroup macro wrong", obj->classgroup == 0);
+	mu_assert("object: class macro wrong", obj->class == 1);
+	mu_assert("object: instance macro wrong", obj->instance == 1);
+
+#define propsize 4
+	Property_PTR props[propsize + 1];
+	props[propsize] = NULL;
+	//fix the first property as a data property
+	props[0] = createDataProperty(0x80, E_READ | E_WRITE | E_NOTIFY, 1, 1,
+			NULL);
+
+	mu_assert("property code[0] does not match", props[0]->propcode == 0x80);
+	//propnum for other properties
+	uint8_t mappropcode = 0x9D;
+	int i = 1;
+	for (i = 1; i < propsize; i++) {
+		props[i] = createProperty(mappropcode++, E_READ);
+
+		//string the props together
+		LAPPEND(props[0], props[i]);
+		PRINTF("property created: %d\n", i);
+		mu_assert("property creation failed", props[i]);
+		mu_assert("property code does not match",
+				props[i]->propcode == (mappropcode - 1));
+
+	}
+	mu_assert("i index not 4 (1st)", i == 4);
+
+	i = 0;
+	FOREACH(props[0], Property_PTR)
+	{
+		i++;
+	}
+	mu_assert("i index not 4 (2nd)", i == 4);
+
+	void * ptr = NULL;
+	i = 0;
+	while ((ptr = freeProperty(props[i]))) {
+		PRINTF("free loop: %d\n", i);
+		mu_assert("freeProperty: incorrect return value", ptr == props[i + 1]);
+		i++;
+	}
+	mu_assert("i index not 4 (3rd)", i == 3);
+	free(obj);
+	return 0;
+}
+
+static char * test_LFINDREPLACE() {
+#define propsize 10
+	Property_PTR props[propsize + 1];
+	Property_PTR prev = NULL;
+	Property_PTR toFind = createProperty(0xFF, E_READ);
+	Property_PTR replacement = createProperty(0xA0, E_READ);
+	Property_PTR found = NULL;
+
+	uint8_t epc = 0x80;
+	for (int i = 0; i < propsize; i++) {
+		props[i] = createProperty(epc++, E_READ | E_WRITE);
+		if (prev) {
+			LAPPEND(prev, props[i]);
+		}
+		prev = props[i];
+	}
+	props[propsize] = NULL;
+
+	found = LFIND(props[0], toFind, compareProperties);
+	mu_assert("found should not have been found", found == NULL);
+	toFind->propcode = 0x88;
+	found = LFIND(props[0], toFind, compareProperties);
+	mu_assert("found is not props[8]", found == props[8]);
+	for (int i = 0; i < propsize; i++) {
+		toFind->propcode = 0x80 + i;
+		found = LFIND(props[0], toFind, compareProperties);
+		mu_assert("found is not props[i]", found == props[i]);
+	}
+
+	toFind->propcode = 0x81;
+
+	//replacement test
+	//Property_PTR phead = props[0];
+	found = LFIND(props[0], toFind, compareProperties);
+	mu_assert("LREPLACE (before rep): target not found", found != NULL);
+	found = LREPLACE(&props[0], found, replacement);
+	mu_assert("LREPLACE: found is null", found != NULL);
+	mu_assert("LREPLACE: found is not old prop0", found->propcode == 0x81);
+	Property_PTR gotten = LGET(props[0], 1);
+	mu_assert("LGET: gotten is null", gotten != NULL);
+	mu_assert("LREPLACE: prop[1] was not replaced", gotten->propcode == 0xA0);
+
+	//replace the head
+	Property_PTR oldhead = props[0];
+	found = LREPLACE(&props[0], props[0], props[1]);
+	mu_assert("LREPLACE: head not replaced", props[0]->propcode == 0x81);
+	mu_assert("LREPLACE: old head is wrong", found->propcode = 0x80);
+	freeProperty(found);
+
+
+	int i = 0;
+	PRINTF("LFIND FREE: ");
+	for (Property_PTR aptr = props[0]; aptr; aptr = freeProperty(aptr)) {
+		PRINTF("%d, ", i++);
+	}
+	PRINTF(" done.\n");
+	mu_assert("LREPLACE: prop list length changed", i == propsize);
+	freeProperty(replacement);
+	freeProperty(toFind);
+	return 0;
+}
+
+static char * test_propertyMaps() {
 	return 0;
 }
 
@@ -410,7 +523,9 @@ static char * allTests() {
 	mu_run_test(test_MLISTS);
 	mu_run_test(test_testProperty);
 	mu_run_test(test_testDataProperty);
-	mu_run_test(test_PropertyMaps);
+	mu_run_test(test_freePropertyAndEOJ);
+	mu_run_test(test_LFINDREPLACE);
+	mu_run_test(test_propertyMaps);
 	return 0;
 }
 
