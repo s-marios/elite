@@ -4,6 +4,7 @@
 #include <limits.h>
 
 #include "elite.h"
+#include "elite_priv.h"
 #include "macrolist.h"
 
 ECHOFRAME_PTR allocateFrame(size_t alocsize) {
@@ -255,9 +256,7 @@ OBJ_PTR createObject(char * eoj) {
 		return 0;
 	}
 	memset(obj, 0, sizeof(OBJ));
-	if (eoj) {
-		memcpy(obj->eoj, eoj, 3);
-	}
+	setEOJ(obj, eoj);
 	return obj;
 }
 
@@ -453,8 +452,6 @@ void flipPropertyBit(uint8_t code, char * pbitmap) {
 	pbitmap[lownibble] |= 0x01 << highnibble;
 }
 
-int computeListMaps(OBJ_PTR obj, char * maps);
-int computeBinaryMaps(OBJ_PTR obj, char * maps);
 
 int computePropertyMaps(OBJ_PTR obj) {
 	//in order: notify, set, get rawmaps
@@ -521,3 +518,8 @@ int computeBinaryMaps(OBJ_PTR obj, char * maps) {
 	return 0;
 }
 
+OBJ_PTR createBasicObject(char * eoj) {
+	OBJ_PTR base = createObject(eoj);
+
+	return base;
+}

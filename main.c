@@ -280,12 +280,12 @@ static char * test_MLISTS() {
 	OBJ_PTR p2 = p1 + 1;
 	p2->i = 2;
 	mu_assert("empty head has next", LHASNEXT(object_p) == NULL);
-	LAPPEND(object_p, p1);
+	LAPPEND(&object_p, p1);
 	PRINTF("object_p->next is: %s\n", object_p ? "true" : "false");
 	mu_assert("next field not adjusted properly", object_p->next == p1);
 	mu_assert("p1->next is not null", p1->next == NULL);
 	mu_assert("p1 i is not 1 (1)", p1->i == 1);
-	LAPPEND(object_p, p2);
+	LAPPEND(&object_p, p2);
 	mu_assert("object_p->next changed", object_p->next == p1);
 
 	FOREACHPURE(object_p)
@@ -308,7 +308,7 @@ static char * test_MLISTS() {
 
 	OBJ_PTR p4 = object_p + 3;
 	p4->i = 4;
-	LPREPEND(object_p, p4);
+	LPREPEND(&object_p, p4);
 	FOREACH(object_p, OBJ_PTR)
 	{
 		PRINTF("elem i: %d, next empty? %s\n", element->i,
@@ -415,7 +415,7 @@ static char * test_freePropertyAndEOJ() {
 		props[i] = createProperty(mappropcode++, E_READ);
 
 		//string the props together
-		LAPPEND(props[0], props[i]);
+		LAPPEND(&props[0], props[i]);
 		PRINTF("property created: %d\n", i);
 		mu_assert("property creation failed", props[i]);
 		mu_assert("property code does not match",
@@ -427,7 +427,7 @@ static char * test_freePropertyAndEOJ() {
 	i = 0;
 	FOREACH(props[0], Property_PTR)
 	{
-		i++;
+		mu_assert("4 props: broken chain", element->next == props[++i]);
 	}
 	mu_assert("i index not 4 (2nd)", i == 4);
 
@@ -439,6 +439,7 @@ static char * test_freePropertyAndEOJ() {
 		i++;
 	}
 	mu_assert("i index not 4 (3rd)", i == 3);
+	PPRINTF("4 props: cleared\n");
 	free(obj);
 	return 0;
 }
@@ -454,11 +455,9 @@ static char * test_LFINDREPLACE() {
 	uint8_t epc = 0x80;
 	for (int i = 0; i < propsize; i++) {
 		props[i] = createProperty(epc++, E_READ | E_WRITE);
-		if (prev) {
-			LAPPEND(prev, props[i]);
-		}
-		prev = props[i];
+		LAPPEND(&prev, props[i]);
 	}
+	mu_assert("LFINDREPLACE: prev not head", prev == props[0]);
 	props[propsize] = NULL;
 
 	found = LFIND(props[0], toFind, compareProperties);
@@ -492,7 +491,6 @@ static char * test_LFINDREPLACE() {
 	mu_assert("LREPLACE: old head is wrong", found->propcode = 0x80);
 	freeProperty(found);
 
-
 	int i = 0;
 	PRINTF("LFIND FREE: ");
 	for (Property_PTR aptr = props[0]; aptr; aptr = freeProperty(aptr)) {
@@ -502,6 +500,25 @@ static char * test_LFINDREPLACE() {
 	mu_assert("LREPLACE: prop list length changed", i == propsize);
 	freeProperty(replacement);
 	freeProperty(toFind);
+	return 0;
+}
+
+static char * test_flipPropertyBit() {
+	char * bitmap = malloc(17 * sizeof(uint8_t));
+	memset(bitmap, 0, 17 * sizeof(uint8_t));
+	flipPropertyBit(0x80, bitmap);
+	mu_assert("flip: 0x80 incorrect flip", bitmap[1] & 0x01);
+	flipPropertyBit(0xF0, bitmap);
+	mu_assert("flip: 0xF0 incorrect flip", bitmap[1] & 0x80);
+	flipPropertyBit(0xBF, bitmap);
+	mu_assert("flip: 0xBF incorrect flip", bitmap[16] & 0x08);
+	flipPropertyBit(0xFF, bitmap);
+	mu_assert("flip: 0xFF incorrect flip", bitmap[16] & 0x80);
+	flipPropertyBit(0x8F, bitmap);
+	mu_assert("flip: 0x8F incorrect flip", bitmap[16] & 0x01);
+	flipPropertyBit(0xEC, bitmap);
+	mu_assert("flip: 0xEC incorrect flip", bitmap[13] & 0x40);
+	free(bitmap);
 	return 0;
 }
 
@@ -525,6 +542,7 @@ static char * allTests() {
 	mu_run_test(test_testDataProperty);
 	mu_run_test(test_freePropertyAndEOJ);
 	mu_run_test(test_LFINDREPLACE);
+	mu_run_test(test_flipPropertyBit);
 	mu_run_test(test_propertyMaps);
 	return 0;
 }

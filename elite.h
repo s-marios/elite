@@ -7,7 +7,7 @@
 /*
  * Debug printfs
  */
-#define ELITE_DEBUG 1
+#define ELITE_DEBUG 2
 
 #define PRINTF
 #define PPRINTF
@@ -93,8 +93,6 @@ int putShort(ECHOFRAME_PTR fptr, uint16_t aShort);
 
 uint16_t getShort(ECHOFRAME_PTR fptr, uint16_t offset);
 int putEOJ(ECHOFRAME_PTR fptr, EOJ eoj);
-//quick dirty macro for putting eojs in frames. the eoj thing is getting ridiculous.
-//#define putEOJ(fptr, eojptr) putBytes(fptr, 3, eojptr)
 
 int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, char * data);
 int putESVnOPC(ECHOFRAME_PTR fptr, ESV esv);
@@ -173,6 +171,12 @@ OBJ_PTR createObject(char * eoj);
 #define setClassGroup(obj_ptr, val) (obj_ptr)->classgroup = val
 #define setClass(obj_ptr, val) (obj_ptr)->class = val
 #define setInstance(obj_ptr, val) (obj_ptr)->instance = val
+#define setEOJ(obj_ptr, eoj) 	do { \
+	if (obj_ptr && eoj) { \
+		memcpy(obj_ptr->eoj, eoj, 3); \
+	} \
+} while (0)
+
 
 int readProperty(Property_PTR property, uint8_t size, char * buf);
 int writeProperty(Property_PTR property, uint8_t size, char * buf);
