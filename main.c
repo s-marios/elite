@@ -17,6 +17,7 @@
 //#include "gdbstub.h"
 
 int tests_run = 0;
+char scratch[128];
 
 static char * test_PRINTF() {
 #ifdef ELITE_DEBUG
@@ -522,6 +523,48 @@ static char * test_flipPropertyBit() {
 	return 0;
 }
 
+static char * test_createBasicObject() {
+	OBJ_PTR obj = (OBJ_PTR) createBasicObject("\x01\x02\x03");
+	uint8_t codes[] = { 0x80, 0x81, 0x82, 0x88, 0x8A, 0x9D, 0x9E, 0x9F };
+	for (int i = 0; i < sizeof(codes); i++) {
+		Property_PTR prop = (Property_PTR) LFIND(obj->pHead, codes[i],
+				comparePropertyCode);
+		sprintf(scratch, "create basic: wrong prop code (%d)", i);
+		mu_assert(scratch, prop->propcode == codes[i]);
+	}
+	computePropertyMaps(obj);
+	//maps computed, time to check correct values.
+	uint8_t ncodes[] = { 0x80, 0x81, 0x88, 0x9D, 0x9E, 0x9F };
+	Property_PTR prop = getProperty(obj, 0x9D);
+	mu_assert("create basic: no 0x9D", prop != NULL && prop->propcode == 0x9D);
+	int res = readProperty(prop, 17, scratch);
+	PPRINTF("Read result: %d\n", res);
+	mu_assert("create basic: cannot read nbitmap",
+			res > 0);
+
+	for (int i = 0; i < sizeof(ncodes); i++) {
+		mu_assert("create basic: wrong notify list map",
+			memcmp(&scratch[1], ncodes, sizeof(ncodes)) == 0);
+	}
+	mu_assert("create basic: wrong notify list number",
+			scratch[0] == sizeof(ncodes));
+	//test the binary map
+	for (int i = 0; i < 16; i++) {
+		addProperty(obj, createProperty(0x8F + i * 0x10, E_READ | E_NOTIFY));
+	}
+	computePropertyMaps(obj);
+	readProperty(getProperty(obj, 0x9D), 17, scratch);
+	mu_assert("create basic: wrong notify bit number",
+			16 + sizeof(ncodes) == scratch[0]);
+	mu_assert("create basic: wrong notify bit map (1)", scratch[16] == 0xFF);
+	mu_assert("cb: 9E", scratch[15] & 0x02);
+	mu_assert("cb: 9D", scratch[14] & 0x02);
+	mu_assert("cb: 88", scratch[9] & 0x01);
+	mu_assert("cb: 81", scratch[2] & 0x01);
+	mu_assert("cb: 80", scratch[1] & 0x01);
+	return 0;
+}
+
 static char * test_propertyMaps() {
 	return 0;
 }
@@ -543,6 +586,7 @@ static char * allTests() {
 	mu_run_test(test_freePropertyAndEOJ);
 	mu_run_test(test_LFINDREPLACE);
 	mu_run_test(test_flipPropertyBit);
+	mu_run_test(test_createBasicObject);
 	mu_run_test(test_propertyMaps);
 	return 0;
 }

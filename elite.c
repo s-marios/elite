@@ -331,6 +331,13 @@ int compareProperties(void * prop, void * other) {
 	return property->propcode - o->propcode;
 }
 
+int comparePropertyCode(void * prop, void * code) {
+	if (prop == NULL) {
+		return INT_MIN;
+	}
+	return ((Property_PTR) prop)->propcode - (int) code;
+}
+
 void initTestProperty(Property_PTR property) {
 	if (property == NULL)
 		return;
@@ -414,19 +421,18 @@ Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 	}
 
 	//setup the read write accessors
-	if (rwn & E_WRITE) {
-		if (datasize < maxsize) {
-			property->write = writeData;
-		} else if (datasize == maxsize) {
-			property->write = writeDataExact;
-		}
+	//readwrite are hooked by default.
+	//access to them is available internally.
+	//if (rwn & E_WRITE) {
+	if (datasize < maxsize) {
+		property->write = writeData;
+	} else if (datasize == maxsize) {
+		property->write = writeDataExact;
 	}
-	if (rwn & E_READ) {
-		property->read = readData;
-	}
-	if (rwn & E_NOTIFY) {
-		//TODO, what do we do about notifications?!
-	}
+	//}
+	//if (rwn & E_READ) {
+	property->read = readData;
+	//}
 	return property;
 }
 
@@ -452,10 +458,30 @@ void flipPropertyBit(uint8_t code, char * pbitmap) {
 	pbitmap[lownibble] |= 0x01 << highnibble;
 }
 
+Property_PTR getProperty(OBJ_PTR obj, uint8_t code) {
+	return (Property_PTR) LFIND(obj->pHead, code, comparePropertyCode);
+}
+
+copyBitmapsToProperties(OBJ_PTR obj, const char * rawmaps) {
+	uint8_t codes[] = { 0x9D, 0x9E, 0x9F };
+	Property_PTR prop;
+	for (int i = 0; i < sizeof(codes); i++) {
+		prop = getProperty(obj, codes[i]);
+
+		//the size of the buffer. Account for list/binary format.
+		uint8_t size = 1 + rawmaps[i * 17];
+		if (size > 17) {
+			size = 17;
+		}
+		int res = writeProperty(prop, size, &rawmaps[i * 17]);
+		PPRINTF("copy bitmaps: %d\n", res);
+	}
+}
 
 int computePropertyMaps(OBJ_PTR obj) {
 	//in order: notify, set, get rawmaps
 	char * rawmaps = malloc(3 * 17);
+	memset(rawmaps, 0, 3 * 17);
 	if (rawmaps == NULL) {
 		PRINTF("run out of memory.");
 		return -1;
@@ -469,11 +495,15 @@ int computePropertyMaps(OBJ_PTR obj) {
 
 	if (count < 16) {
 		//TODO simpe bytes
-		return computeListMaps(obj, rawmaps);
+		computeListMaps(obj, rawmaps);
 	} else {
 		//TODO bitflips
-		return computeBinaryMaps(obj, rawmaps);
+		computeBinaryMaps(obj, rawmaps);
 	}
+	//rawmaps populated. copy this to the appropriate properties.
+	copyBitmapsToProperties(obj, rawmaps);
+
+	free(rawmaps);
 	return 0;
 }
 
@@ -518,8 +548,25 @@ int computeBinaryMaps(OBJ_PTR obj, char * maps) {
 	return 0;
 }
 
+/**
+ * creates a basic object with properties 0x80, 0x81, 0x82, 0x88,
+ * 0x8A, 0x9D, 0x9E, 0x9F
+ */
 OBJ_PTR createBasicObject(char * eoj) {
 	OBJ_PTR base = createObject(eoj);
+	if (base == NULL) {
+		return NULL;
+	}
+	addProperty(base, createProperty(0x80, E_READ | E_NOTIFY));
+	addProperty(base,
+			createDataProperty(0x81, E_READ | E_WRITE | E_NOTIFY, 1, 1, NULL));
+	addProperty(base, createDataProperty(0x82, E_READ, 4, 4, "\0\0H\0"));
+	addProperty(base,
+			createDataProperty(0x88, E_READ | E_NOTIFY, 1, 1, "\x41"));
+	addProperty(base, createDataProperty(0x8A, E_READ, 3, 3, "AAA"));
+	addProperty(base, createDataProperty(0x9D, E_READ | E_NOTIFY, 17, 0, NULL));
+	addProperty(base, createDataProperty(0x9E, E_READ | E_NOTIFY, 17, 0, NULL));
+	addProperty(base, createDataProperty(0x9F, E_READ | E_NOTIFY, 17, 0, NULL));
 
 	return base;
 }

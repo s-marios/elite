@@ -137,6 +137,10 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 //this is essentially forward declaration for the property struct
 typedef struct Property Property;
 typedef struct Property * Property_PTR;
+/**
+ * function type for read write operations
+ * return the number of bytes read or written.
+ */
 typedef int (*READWRITE)(Property_PTR property, uint8_t size, char * buf);
 typedef Property_PTR (*FREEFUNC)(Property_PTR property);
 
@@ -177,9 +181,11 @@ OBJ_PTR createObject(char * eoj);
 	} \
 } while (0)
 
+#define addProperty(obj_ptr, property) LAPPEND( &obj_ptr->pHead, property)
 
 int readProperty(Property_PTR property, uint8_t size, char * buf);
 int writeProperty(Property_PTR property, uint8_t size, char * buf);
+Property_PTR getProperty(OBJ_PTR obj, uint8_t code);
 
 /**
  * Frees a property.
@@ -203,6 +209,7 @@ Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 		uint8_t dataSize, char * data);
 
 int compareProperties(void * prop, void * other);
+int comparePropertyCode(void * prop, void * code);
 
 //for some testing
 int testRead(Property_PTR property, uint8_t size, char * buf);
