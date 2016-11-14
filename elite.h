@@ -20,11 +20,22 @@
 #define PPRINTF printf
 #endif
 #endif
+
+//this is essentially forward declaration for the OBJ struct
+typedef struct OBJ OBJ;
+typedef struct OBJ * OBJ_PTR;
+
+//this is essentially forward declaration for the property struct
+typedef struct Property Property;
+typedef struct Property * Property_PTR;
+
+
 /**
  * This is the overall control structure for ECHONET Lite operations
  */
 typedef struct {
 	uint16_t TID;
+	OBJ_PTR oHead;
 } ECHOCTRL, *ECHOCTRL_PTR;
 
 ECHOCTRL_PTR createEchonetControl();
@@ -134,9 +145,6 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 #define getESV(x) x->data[OFF_ESV]
 #define getOPC(x) x->data[OFF_OPC]
 
-//this is essentially forward declaration for the property struct
-typedef struct Property Property;
-typedef struct Property * Property_PTR;
 /**
  * function type for read write operations
  * return the number of bytes read or written.
@@ -164,13 +172,14 @@ struct Property {
 #define class eoj[1]
 #define instance eoj[2]
 
-typedef struct {
+struct OBJ {
 	void * next;
 	int i; /*!< this was used for tests */
 	Property_PTR pHead;
 	uint8_t eoj[3];
-} OBJ, *OBJ_PTR;
+};
 
+void freeObject(OBJ_PTR obj);
 OBJ_PTR createObject(char * eoj);
 #define setClassGroup(obj_ptr, val) (obj_ptr)->classgroup = val
 #define setClass(obj_ptr, val) (obj_ptr)->class = val
@@ -221,5 +230,32 @@ void flipPropertyBit(uint8_t code, char * pbitmap);
  * adds the corresponding properties (9d,9e,9f) to it.
  */
 int computePropertyMaps(OBJ_PTR obj);
+
+/**
+ * creates a basic object with the bare minimum necessary properties.
+ */
+OBJ_PTR createBasicObject(char * eoj);
+
+#define PROFILEEOJ "\x0E\xF0\x01"
+/**
+ * creates a basic node profile object with the bare minimum necessary
+ * properties.
+ */
+OBJ_PTR createNodeProfileObject();
+
+void computeNodeClassInstanceLists(OBJ_PTR obj);
+
+OBJ_PTR getObject(OBJ_PTR oHead, char * eoj);
+//get the object by passing in the elite control structure
+#define GETOBJECT(ctrl, eoj) getObject(ctrl->oHead, eoj)
+
+//TODO move to a sane place
+/**
+ * 63 /3 = 21 instances + instance number
+ */
+
+#define E_INSTANCELISTSIZE 64
+
+
 
 #endif

@@ -406,7 +406,7 @@ static char * test_freePropertyAndEOJ() {
 	props[propsize] = NULL;
 	//fix the first property as a data property
 	props[0] = createDataProperty(0x80, E_READ | E_WRITE | E_NOTIFY, 1, 1,
-			NULL);
+	NULL);
 
 	mu_assert("property code[0] does not match", props[0]->propcode == 0x80);
 	//propnum for other properties
@@ -539,12 +539,11 @@ static char * test_createBasicObject() {
 	mu_assert("create basic: no 0x9D", prop != NULL && prop->propcode == 0x9D);
 	int res = readProperty(prop, 17, scratch);
 	PPRINTF("Read result: %d\n", res);
-	mu_assert("create basic: cannot read nbitmap",
-			res > 0);
+	mu_assert("create basic: cannot read nbitmap", res > 0);
 
 	for (int i = 0; i < sizeof(ncodes); i++) {
 		mu_assert("create basic: wrong notify list map",
-			memcmp(&scratch[1], ncodes, sizeof(ncodes)) == 0);
+				memcmp(&scratch[1], ncodes, sizeof(ncodes)) == 0);
 	}
 	mu_assert("create basic: wrong notify list number",
 			scratch[0] == sizeof(ncodes));
@@ -562,10 +561,100 @@ static char * test_createBasicObject() {
 	mu_assert("cb: 88", scratch[9] & 0x01);
 	mu_assert("cb: 81", scratch[2] & 0x01);
 	mu_assert("cb: 80", scratch[1] & 0x01);
+	FREEPROPERTIES(obj->pHead);
+
 	return 0;
 }
 
 static char * test_propertyMaps() {
+	return 0;
+}
+
+static char * test_createNodeProfileObject() {
+	OBJ_PTR profile = createNodeProfileObject();
+	int propNum = 0;
+	FOREACH(profile->pHead, Property_PTR)
+	{
+		propNum++;
+	}
+	mu_assert("createNPO: wrong number of properties", propNum == 12);
+	Property_PTR property = getProperty(profile, 0x8A);
+	int res = readProperty(property, 3, scratch);
+	mu_assert("createNPO: 0x8A read size wrong", res == 3);
+	mu_assert("createNPO: 0x8A read contents wrong",
+			memcmp(scratch, "AAA", 3) == 0);
+	uint8_t propNums[] = { 0x8A, 0x9D, 0x9E, 0x9F, 0x80, 0x82, 0x83, 0xD3, 0xD4,
+			0xD5, 0xD6, 0xD7 };
+	for (int i = 0; i < sizeof(propNums); i++) {
+		sprintf(scratch, "createNPO: unavailable prop (index = %d)", i);
+		property = getProperty(profile, propNums[i]);
+		mu_assert(scratch, property != NULL);
+	}
+
+	freeObject(profile);
+	return 0;
+}
+
+static char * test_computeClassesAndInstances() {
+	OBJ_PTR profile = createNodeProfileObject();
+	mu_assert("node profile: wrong EOJ", CMPEOJ(profile->eoj, PROFILEEOJ) == 0);
+	char * eojs[] = { "\x01\x02\x01", "\x01\x02\x02", "\x03\x04\x05" };
+	OBJ_PTR objs[3];
+	for (int i = 0; i < 3; i++) {
+		objs[i] = createBasicObject(eojs[i]);
+		LAPPEND(&profile, objs[i]);
+	}
+	int objnum = 0;
+	FOREACHPURE(profile)
+	{
+		objnum++;
+	}
+	mu_assert("CI: not four objects", objnum == 4);
+
+	computeNodeClassInstanceLists(profile);
+
+	Property_PTR property = NULL;
+	//d3 check
+	property = getProperty(profile, 0xD3);
+	int res = readProperty(property, 3, scratch);
+	PPRINTF("ni: %d res: %d\n", scratch[2], res);
+	mu_assert("CI: read size of d3", res == 3);
+	mu_assert("CI: d3 wrong number of instances", scratch[2] == 3);
+	property = getProperty(profile, 0xD4);
+	res = readProperty(property, 2, scratch);
+	PPRINTF("nc: %d res: %d\n", scratch[1], res);
+	mu_assert("CI: d4 read size", res == 2);
+	mu_assert("CI: d4 wrong number of classes", scratch[1] == 3);
+	//d7
+	property = getProperty(profile, 0xD7);
+	res = readProperty(property, 17, scratch);
+	PPRINTF("d7 size: %d\n", res);
+	mu_assert("CI: d7 read size", res == 5);
+	mu_assert("CI: d7 data", memcmp(scratch, "\x02\x01\x02\x03\x04", res) == 0);
+
+	//d6
+	property = getProperty(profile, 0xD6);
+	res = readProperty(property, 17, scratch);
+	PPRINTF("d6 size: %d\n", res);
+	mu_assert("CI: d6 read size", res == 10);
+	mu_assert("CI: d6 data",
+			memcmp(scratch, "\x03\x01\x02\x01\x01\x02\x02\x03\x04\x05", res)
+					== 0);
+
+	//d5 is the same as d6
+	property = getProperty(profile, 0xD5);
+	res = readProperty(property, 17, scratch);
+	PPRINTF("d5 size: %d\n", res);
+	mu_assert("CI: d5 read size", res == 10);
+	mu_assert("CI: d5 data",
+			memcmp(scratch, "\x03\x01\x02\x01\x01\x02\x02\x03\x04\x05", res)
+					== 0);
+
+	FOREACH(profile, OBJ_PTR)
+	{
+		freeObject(element);
+	}
+
 	return 0;
 }
 
@@ -588,6 +677,8 @@ static char * allTests() {
 	mu_run_test(test_flipPropertyBit);
 	mu_run_test(test_createBasicObject);
 	mu_run_test(test_propertyMaps);
+	mu_run_test(test_createNodeProfileObject);
+	mu_run_test(test_computeClassesAndInstances);
 	return 0;
 }
 

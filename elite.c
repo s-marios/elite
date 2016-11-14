@@ -250,6 +250,11 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc) {
 	return 1;
 }
 
+void freeObject(OBJ_PTR obj) {
+	FREEPROPERTIES(obj->pHead);
+	free(obj);
+}
+
 OBJ_PTR createObject(char * eoj) {
 	OBJ_PTR obj = malloc(sizeof(OBJ));
 	if (obj == NULL) {
@@ -569,4 +574,167 @@ OBJ_PTR createBasicObject(char * eoj) {
 	addProperty(base, createDataProperty(0x9F, E_READ | E_NOTIFY, 17, 0, NULL));
 
 	return base;
+}
+
+OBJ_PTR createNodeProfileObject() {
+	//only one node profile.
+	OBJ_PTR node = createObject(PROFILEEOJ);
+	//superclass properties.
+	addProperty(node, createDataProperty(0x8A, E_READ, 3, 3, "AAA"));
+	addProperty(node, createDataProperty(0x9D, E_READ | E_NOTIFY, 17, 0, NULL));
+	addProperty(node, createDataProperty(0x9E, E_READ | E_NOTIFY, 17, 0, NULL));
+	addProperty(node, createDataProperty(0x9F, E_READ | E_NOTIFY, 17, 0, NULL));
+	//class properties
+	addProperty(node,
+			createDataProperty(0x80, E_READ | E_NOTIFY, 1, 1, "\x30"));
+	addProperty(node,
+			createDataProperty(0x82, E_READ, 4, 4, "\x01\0x0C\0x01\x00"));
+	addProperty(node,
+			createDataProperty(0x83, E_READ, 17, 17,
+					"\x31\x32\x33\x34\x35\x36\x37\x38\x39\x30\x31\x32\x33\x34\x35\x36\x37"));
+	addProperty(node, createDataProperty(0xD3, E_READ | E_NOTIFY, 3, 0, NULL ));
+	addProperty(node, createDataProperty(0xD4, E_READ | E_NOTIFY, 2, 0, NULL ));
+	addProperty(node,
+			createDataProperty(0xD5, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0, NULL ));
+	addProperty(node,
+			createDataProperty(0xD6, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0, NULL ));
+	addProperty(node,
+			createDataProperty(0xD7, E_READ | E_NOTIFY, 17, 0, NULL ));
+	return node;
+}
+
+OBJ_PTR getObject(OBJ_PTR oHead, char * eoj) {
+	FOREACH(oHead, OBJ_PTR)
+	{
+		if ( CMPEOJ(element->eoj, eoj) == 0) {
+			return element;
+		}
+	}
+	return NULL;
+}
+
+int computeNumberOfInstances(OBJ_PTR oHead) {
+	int num = 0;
+	FOREACHPURE(oHead)
+	{
+		num++;
+	}
+	//remove node profile instance
+	return num - 1;
+}
+
+int isClassPresent(char * buf, uint8_t * eoj) {
+	for (int i = 1; i < 17; i = i + 2) {
+		if (memcmp(&buf[i], eoj, 2) == 0) {
+			return i;
+		}
+	}
+	return 0;
+}
+/**
+ * computes the number of unique classes and creates a list of them
+ * param result the class result (exactly 17 bytes of length)
+ * return number of classes +1 node profile
+ */
+int computeClasses(OBJ_PTR oHead, char * result) {
+	if (result == NULL || oHead == NULL) {
+		return -1;
+	}
+	memset(result, 0, 17);
+	FOREACH(oHead, OBJ_PTR)
+	{
+		if (!isClassPresent(result, element->eoj)) {
+			if (result[0] >= 8) {
+				PPRINTF(
+						"compute classes: out of class list \
+						space, ignoring class...\n");
+			} else {
+				//check for node profile (exclude)
+				if (CMPEOJ(element->eoj, PROFILEEOJ)) {
+					//copy that unique class in the result buffer.
+					memcpy(&result[1 + result[0] * 2], element->eoj, 2);
+					result[0]++;
+				}
+			}
+		}
+	}
+	//+1 is for property d4
+	return result[0] + 1;
+}
+
+int isInstancePresent(char * buf, uint8_t *eoj) {
+	for (int i = 1; i < E_INSTANCELISTSIZE; i = i + 3) {
+		if (memcmp(&buf[i], eoj, 3) == 0) {
+			return i;
+		}
+	}
+	return 0;
+}
+
+int computeInstances(OBJ_PTR oHead, char * result) {
+	if (result == NULL || oHead == NULL) {
+		return -1;
+	}
+	memset(result, 0, E_INSTANCELISTSIZE);
+	int maxinstances = (E_INSTANCELISTSIZE - 1) / 3;
+	FOREACH(oHead, OBJ_PTR)
+	{
+		if (!isInstancePresent(result, element->eoj)) {
+			if (result[0] >= (maxinstances)) {
+				PPRINTF(
+						"compute instances: out of space, \
+						ignoring instance\n");
+			} else {
+				//check for node profile (exclude)
+				if (CMPEOJ(element->eoj, PROFILEEOJ)) {
+					memcpy(&result[1 + result[0] * 3], element->eoj, 3);
+					result[0]++;
+				}
+
+			}
+		}
+	}
+	return result[0];
+}
+
+void computeNodeClassInstanceLists(OBJ_PTR oHead) {
+	OBJ_PTR profile = getObject(oHead, PROFILEEOJ);
+	if (profile == NULL) {
+		PPRINTF("compute classes and instances: NULL profile object\n");
+		return;
+	}
+	Property_PTR prop = NULL;
+	int d3 = computeNumberOfInstances(oHead);
+	char d3buf[] = { 0, 0, d3 };
+	//d3 write
+	prop = getProperty(profile, 0xD3);
+	writeProperty(prop, 3, d3buf);
+
+	//class list and number of classes calculation
+	char * res = malloc(17);
+	memset(res, 0, 17);
+	int d4 = computeClasses(oHead, res);
+	//d4 write
+	prop = getProperty(profile, 0xD4);
+	char d4buff[] = { 0, d4 };
+	writeProperty(prop, 2, d4buff);
+	//d7 write
+	prop = getProperty(profile, 0xD7);
+	int propsize = res[0] * 2 + 1; //2byte eoj + objcount (1 byte)
+	writeProperty(prop, propsize, res);
+	free(res);
+
+	//instance lists, common for d5,d6
+	res = malloc(E_INSTANCELISTSIZE);
+	memset(res, 0, E_INSTANCELISTSIZE);
+	int d5 = computeInstances(oHead, res);
+	//d5 write
+	prop = getProperty(profile, 0xD5);
+	propsize = res[0] * 3 + 1; //3byte eojs + objcount (1byte)
+	writeProperty(prop, propsize, res);
+	//d6 is same as d5, write
+	prop = getProperty(profile, 0xD6);
+	writeProperty(prop, propsize, res);
+	//TODO copy to property
+	free(res);
 }
