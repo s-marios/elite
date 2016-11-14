@@ -110,6 +110,41 @@ ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID) {
 	return fptr;
 }
 
+ESV getAffirmativeESV(ESV esv) {
+	if (esv & ESV_REQUIRESANSWER) {
+		return esv + 0x10;
+	}
+	if (esv == ESV_INFC) {
+		return ESV_INFCRES;
+	}
+	return 0;
+}
+
+ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, char * eoj,
+		size_t alocsize) {
+	if (incoming == NULL) {
+		return NULL;
+	}
+	ECHOFRAME_PTR fptr = initFrame(alocsize, getTID(incoming));
+	//source eoj is us
+	if (eoj) {
+		putEOJ(fptr, eoj);
+	} else {
+		putEOJ(fptr, getSEOJ(incoming));
+	}
+	//deoj is source eoj of incoming
+	putEOJ(fptr, getSEOJ(incoming));
+
+	ESV esvr = getAffirmativeESV(getESV(incoming));
+	if (esvr == 0) {
+		PPRINTF("init frame simple request: unrecognized ESV, dropping..\n");
+		free(fptr);
+		return NULL;
+	}
+	putESVnOPC(fptr, esvr);
+	return fptr;
+}
+
 uint16_t getShort(ECHOFRAME_PTR fptr, uint16_t offset) {
 	if (offset < 0 || offset > fptr->used) {
 		return 0xffff;
@@ -747,13 +782,143 @@ void computeNodeClassInstanceLists(OBJ_PTR oHead) {
 	free(res);
 }
 
-ECHOFRAME_PTR processFrame(ECHOFRAME_PTR incoming) {
+int processWrite(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj) {
+	PARSE_EPC parsedepc;
+	memset(&parsedepc, 0, sizeof(parsedepc));
+	while (getNextEPC(incoming, &parsedepc)) {
+		Property_PTR property = getProperty(obj, parsedepc.epc);
+		if (property
+				&& writeProperty(property, parsedepc.pdc, parsedepc.edt) > 0) {
+			//property exists and write succeeded
+			putEPC(response, property->propcode, 0, NULL);
+		} else {
+			//no such property OR write fail. same handling
+			//write fail - put the original contents in.
+			putEPC(response, parsedepc.epc, parsedepc.pdc, parsedepc.edt);
+			//change ESV to failure
+			setESV(response, getESV(incoming) - 0x10);
+			return -1;
+		}
+	}
+	//all properties processed properly
+	return 0;
+}
+
+int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj) {
+	static char readbuffer[ECHOFRAME_MAXSIZE];
+	static uint8_t readres;
+	PARSE_EPC parsedepc;
+	memset(&parsedepc, 0, sizeof(parsedepc));
+	while (getNextEPC(incoming, &parsedepc)) {
+		Property_PTR property = getProperty(obj, parsedepc.epc);
+		if (property) {
+			readres = readProperty(property, ECHOFRAME_MAXSIZE, readbuffer);
+			if (readres > 0) {
+				//property exists and read succeeded
+				putEPC(response, property->propcode, readres, readbuffer);
+			} else {
+				putEPC(response, parsedepc.epc, 0, NULL);
+				//change ESV to failure
+				setESV(response, getESV(incoming) - 0x10);
+				return -1;
+			}
+		}
+
+		else {
+			//no such property
+			putEPC(response, parsedepc.epc, 0, NULL);
+			//change ESV to failure
+			setESV(response, getESV(incoming) - 0x10);
+			return -1;
+		}
+	}
+	//all properties processed properly
+	return 0;
+}
+
+ECHOFRAME_PTR getPerObjectResponse(ECHOFRAME_PTR incoming, OBJ_PTR obj) {
 	if (incoming == NULL) {
 		return NULL;
 	}
 	ECHOFRAME_PTR res = NULL;
 	uint8_t esv = getESV(incoming);
-	if (esv & ESV_NEEDSANSWER) {
-		res = initFrameDepr(NULL, 0, getTID(incoming));
+	if (esv & ESV_REQUIRESANSWER) {
+		res = initFrameResponse(incoming, NULL, ECHOFRAME_MAXSIZE);
+	}
+	switch (esv) {
+	case ESV_SETC: //intentional fall through.
+	case ESV_SETI: {
+		int writeres = processWrite(incoming, res, obj);
+		if (writeres < 0) { //set failed.
+			return res;
+		}
+		break;
+	}
+	case ESV_GET: {
+		int readres = processRead(incoming, res, obj);
+		if (readres < 0) { //get failed.
+			return res;
+		}
+		break;
+	}
+	case ESV_SETGET:
+		PPRINTF("TODO: SetGet not supported yet");
+	default:
+		PPRINTF("pIF: Unrecognized ESV, doing nothing\n");
+	}
+	return res;
+}
+
+OBJ_PTR matchObjects(OBJMATCH_PTR matcher) {
+	OBJ_PTR head = NULL;
+	if (matcher == NULL || matcher->eoj == NULL || matcher->oHead == NULL) {
+		return NULL;
+	}
+	if (matcher->lastmatch != NULL) {
+		head = matcher->lastmatch->next;
+	} else {
+		head = matcher->oHead;
+	}
+
+	uint8_t matchlength = 3;
+	if (GETINSTANCE(matcher->eoj) == 0) {
+		matchlength = 2;
+	}
+	//all setup, do the matching.
+	//only instance matching supported right now
+	FOREACH(head, OBJ_PTR)
+	{
+		if (memcmp(matcher->eoj, element->eoj, matchlength) == 0) {
+			matcher->lastmatch = element;
+			return matcher->lastmatch;
+		}
+	}
+	matcher->lastmatch = NULL;
+	return NULL;
+}
+
+void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead) {
+	if (parseFrame(incoming) != PR_OK) {
+		PPRINTF("bad echonet frame, dropping...");
+		return;
+	}
+
+	//we have a good frame, get the object matches.
+	OBJMATCH m;
+	OBJMATCH_PTR matcher = &m;
+	memset(matcher, 0, sizeof(OBJMATCH));
+	matcher->eoj = getDEOJ(incoming);
+	matcher->oHead = oHead;
+	while (matchObjects(matcher)) {
+		ECHOFRAME_PTR response = getPerObjectResponse(incoming,
+				matcher->lastmatch);
+		if (response) {
+			//TODO do something with the response.
+			//SEND THEM over the wire
+			PPRINTF("pIF: created a response: \n");
+			dumpFrame(response);
+			//TODO: who frees the frame?
+			free(response);
+		}
 	}
 }

@@ -29,7 +29,6 @@ typedef struct OBJ * OBJ_PTR;
 typedef struct Property Property;
 typedef struct Property * Property_PTR;
 
-
 /**
  * This is the overall control structure for ECHONET Lite operations
  */
@@ -52,7 +51,7 @@ typedef struct {
 
 #define ECHOFRAME_HEAD(x) (((x)->data[(x)->used]))
 #define ECHOFRAME_STDSIZE 128
-#define ECHOFRAME_MAXSIZE 256
+#define ECHOFRAME_MAXSIZE 255
 //frame should be at least 14 bytes or else discarded
 //header (2) + TID (2)+ SDEOJ (6)+ ESVOPC (2) + EPCPDC (2)
 #define ECHOFRAME_MINSIZE 14
@@ -75,7 +74,7 @@ typedef enum {
 	ESV_INF_SNA = 0x53,
 	ESV_SETGET_SNA = 0x5E
 } ESV;
-#define ESV_NEEDSANSWER (ESV_SETC | ESV_GET | ESV_INFREQ | ESV_SETGET)
+#define ESV_REQUIRESANSWER (ESV_SETC | ESV_GET | ESV_INFREQ | ESV_SETGET)
 
 #define E_HD1 0x10
 #define E_HD2 0x81
@@ -98,6 +97,13 @@ typedef char EOJ[3];
 ECHOFRAME_PTR allocateFrame(size_t alocsize);
 ECHOFRAME_PTR initFrameDepr(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID);
 ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID);
+/**
+ * creates a simple response frame.
+ *
+ * reverses seoj/deoj of incoming packet
+ */
+ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, char * eoj,
+		size_t alocsize);
 
 int putByte(ECHOFRAME_PTR fptr, char byte);
 int putBytes(ECHOFRAME_PTR fptr, uint8_t num, char * data);
@@ -108,6 +114,8 @@ int putEOJ(ECHOFRAME_PTR fptr, EOJ eoj);
 
 int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, char * data);
 int putESVnOPC(ECHOFRAME_PTR fptr, ESV esv);
+#define setESV(fptr, esv) (fptr->data[OFF_ESV] = esv)
+
 void finalizeFrame(ECHOFRAME_PTR fptr);
 void dumpFrame(ECHOFRAME_PTR fptr);
 
@@ -132,13 +140,16 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr);
 
 //this is a parsed EPC, but the name EPC conflicts
 typedef struct {
-	uint8_t opc;
-	uint8_t propIndex;
-	uint8_t epc;
-	uint8_t pdc;
-	char * edt;
+	uint8_t opc; /**< number of properties */
+	uint8_t propIndex; /**< current property index? */
+	uint8_t epc; /**< property code */
+	uint8_t pdc; /**< data count */
+	char * edt; /**< data */
 } PARSE_EPC, *PARSE_EPC_PTR;
 
+/**
+ * return 1 if found, 0 if no next epc found
+ */
 int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 #define getTID(x) getShort(x, OFF_TID)
 #define getSEOJ(x) &x->data[OFF_SEOJ]
@@ -257,6 +268,11 @@ OBJ_PTR getObject(OBJ_PTR oHead, char * eoj);
 
 #define E_INSTANCELISTSIZE 64
 
-
+typedef struct {
+	OBJ_PTR lastmatch;
+	OBJ_PTR oHead;
+	char * eoj;
+} OBJMATCH, *OBJMATCH_PTR;
+OBJ_PTR matchObjects(OBJMATCH_PTR matcher);
 
 #endif

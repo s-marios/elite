@@ -650,6 +650,47 @@ static char * test_computeClassesAndInstances() {
 			memcmp(scratch, "\x03\x01\x02\x01\x01\x02\x02\x03\x04\x05", res)
 					== 0);
 
+	//matcher test - don't want to recreate everything..
+	OBJMATCH m;
+	OBJMATCH_PTR matcher = &m;
+	memset(matcher, 0, sizeof(OBJMATCH));
+	matcher->oHead = profile;
+	int i = 0;
+	//single match
+
+	matcher->eoj = "\x03\x04\x05";
+	while (matchObjects(matcher)) {
+		mu_assert("matcher (single): null match", matcher->lastmatch != NULL);
+		mu_assert("matcher (single): object does not match",
+				matcher->lastmatch == objs[2]);
+		i++;
+	}
+	mu_assert("matcher (single): object matched count not 1", i == 1);
+	mu_assert("matcher (single): not null after end",
+			matcher->lastmatch == NULL);
+
+	//multi match
+	matcher->eoj = "\x01\x02\x00";
+	i = 0;
+	while (matchObjects(matcher)) {
+		sprintf(scratch, "matcher: %d th object is not matched\n", i);
+		//mu_assert(scratch,
+		//		CMPEOJ(matcher->lastmatch->eoj, eojs[i]) == 0);
+		mu_assert("matcher: is null", matcher->lastmatch != NULL);
+		mu_assert(scratch, matcher->lastmatch == objs[i]);
+		i++;
+	}
+	mu_assert("matcher: 2 objects matched", i == 2);
+	mu_assert("matcher: not null after end", matcher->lastmatch == NULL);
+
+	matcher->eoj = "\xff\xff\xff"; //non-existing object
+	i = 0;
+	while (matchObjects(matcher)) {
+		i++;
+	}
+	mu_assert("matcher (non-existing): matched something!!",
+			matcher->lastmatch == NULL && i == 0);
+
 	FOREACH(profile, OBJ_PTR)
 	{
 		freeObject(element);
