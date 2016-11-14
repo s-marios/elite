@@ -60,7 +60,7 @@ static char * test_malloc1() {
 static char * test_putgetShort() {
 	ECHOCTRL_PTR ectrl = createEchonetControl();
 	mu_assert("echonet control init TID not 1", ectrl->TID == 1);
-	ECHOFRAME_PTR frame = initFrame(ectrl, ECHOFRAME_STDSIZE, 0);
+	ECHOFRAME_PTR frame = initFrameDepr(ectrl, ECHOFRAME_STDSIZE, 0);
 	mu_assert("frame init failed", frame != NULL);
 	mu_assert("putShort failed", putShort(frame, 0xABCD) != -1);
 	mu_assert("frame size(used) is not 6", frame->used == 6);
@@ -74,7 +74,7 @@ static char * test_initFrame() {
 	ECHOCTRL_PTR ectrl = createEchonetControl();
 	mu_assert("echonet control init TID not 1", ectrl->TID == 1);
 
-	ECHOFRAME_PTR frame = initFrame(ectrl, ECHOFRAME_STDSIZE, 0);
+	ECHOFRAME_PTR frame = initFrameDepr(ectrl, ECHOFRAME_STDSIZE, 0);
 	mu_assert("frame init failed", frame != NULL);
 	mu_assert("frame header invalid byte 1", frame->data[0] == E_HD1);
 	mu_assert("frame header invalid byte 1", frame->data[1] == E_HD2);
@@ -99,7 +99,7 @@ static char * test_initFrame() {
 
 static char * test_putEOJESV() {
 	ECHOCTRL_PTR ectrl = createEchonetControl();
-	ECHOFRAME_PTR frame = initFrame(ectrl, 0, 0);
+	ECHOFRAME_PTR frame = initFrameDepr(ectrl, 0, 0);
 
 	mu_assert("after initFrame :frame epc counter not zero",
 			frame->propNum == 0);
@@ -173,7 +173,7 @@ static char * test_putEOJESV() {
 
 static char * test_parseFrame() {
 	ECHOCTRL_PTR ectrl = createEchonetControl();
-	ECHOFRAME_PTR frame = initFrame(ectrl, 0, 0);
+	ECHOFRAME_PTR frame = initFrameDepr(ectrl, 0, 0);
 	mu_assert("parseFrame: empty frame detection failed",
 			parseFrame(NULL) == PR_NULL);
 	mu_assert("parseFrame: header/tid frame too short detection failed",
@@ -235,7 +235,7 @@ static char * test_parseFrame() {
 static char * test_getNextEPC() {
 
 	ECHOCTRL_PTR ectrl = createEchonetControl();
-	ECHOFRAME_PTR frame = initFrame(ectrl, 0, 0);
+	ECHOFRAME_PTR frame = initFrameDepr(ectrl, 0, 0);
 	EOJ eoj;
 	SETEOJ(eoj, 0x01, 0x02, 0x03);
 	putEOJ(frame, eoj);

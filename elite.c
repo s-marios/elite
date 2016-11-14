@@ -91,13 +91,21 @@ void finalizeFrame(ECHOFRAME_PTR fptr) {
 	fptr->data[OFF_OPC] = fptr->propNum;
 }
 
-ECHOFRAME_PTR initFrame(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID) {
+ECHOFRAME_PTR initFrameDepr(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID) {
 	ECHOFRAME_PTR fptr = allocateFrame(alocsize);
 	putByte(fptr, E_HD1);
 	putByte(fptr, E_HD2);
 	if (TID == 0) {
 		TID = incTID(cptr);
 	}
+	putShort(fptr, TID);
+	return fptr;
+}
+
+ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID) {
+	ECHOFRAME_PTR fptr = allocateFrame(alocsize);
+	putByte(fptr, E_HD1);
+	putByte(fptr, E_HD2);
 	putShort(fptr, TID);
 	return fptr;
 }
@@ -737,4 +745,15 @@ void computeNodeClassInstanceLists(OBJ_PTR oHead) {
 	writeProperty(prop, propsize, res);
 	//TODO copy to property
 	free(res);
+}
+
+ECHOFRAME_PTR processFrame(ECHOFRAME_PTR incoming) {
+	if (incoming == NULL) {
+		return NULL;
+	}
+	ECHOFRAME_PTR res = NULL;
+	uint8_t esv = getESV(incoming);
+	if (esv & ESV_NEEDSANSWER) {
+		res = initFrameDepr(NULL, 0, getTID(incoming));
+	}
 }

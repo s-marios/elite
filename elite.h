@@ -44,7 +44,6 @@ ECHOCTRL_PTR createEchonetControl();
  * A structure representing an ECHONET Lite frame.
  */
 typedef struct {
-
 	size_t used;
 	size_t allocated;
 	uint8_t propNum;
@@ -76,6 +75,7 @@ typedef enum {
 	ESV_INF_SNA = 0x53,
 	ESV_SETGET_SNA = 0x5E
 } ESV;
+#define ESV_NEEDSANSWER (ESV_SETC | ESV_GET | ESV_INFREQ | ESV_SETGET)
 
 #define E_HD1 0x10
 #define E_HD2 0x81
@@ -96,7 +96,8 @@ typedef char EOJ[3];
 #define CMPEOJ(x, y) memcmp(x, y, 3)
 
 ECHOFRAME_PTR allocateFrame(size_t alocsize);
-ECHOFRAME_PTR initFrame(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t EID);
+ECHOFRAME_PTR initFrameDepr(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID);
+ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID);
 
 int putByte(ECHOFRAME_PTR fptr, char byte);
 int putBytes(ECHOFRAME_PTR fptr, uint8_t num, char * data);
