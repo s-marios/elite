@@ -245,7 +245,7 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 			continue;
 		} else if (index == fptr->used) {
 			//did we read all the properties?
-			PPRINTF("opc propIndex: %d %d", opc, epc.propIndex);
+			PPRINTF("opc propIndex: %d %d\n", opc, epc.propIndex);
 			if (epc.propIndex == opc) {
 				//everything matches
 				return PR_OK;
@@ -605,7 +605,8 @@ OBJ_PTR createBasicObject(char * eoj) {
 	if (base == NULL) {
 		return NULL;
 	}
-	addProperty(base, createProperty(0x80, E_READ | E_NOTIFY));
+	addProperty(base,
+			createDataProperty(0x80, E_READ | E_NOTIFY, 1, 1, "\x30"));
 	addProperty(base,
 			createDataProperty(0x81, E_READ | E_WRITE | E_NOTIFY, 1, 1, NULL));
 	addProperty(base, createDataProperty(0x82, E_READ, 4, 4, "\0\0H\0"));
@@ -843,7 +844,7 @@ ECHOFRAME_PTR getPerObjectResponse(ECHOFRAME_PTR incoming, OBJ_PTR obj) {
 	ECHOFRAME_PTR res = NULL;
 	uint8_t esv = getESV(incoming);
 	if (esv & ESV_REQUIRESANSWER) {
-		res = initFrameResponse(incoming, NULL, ECHOFRAME_MAXSIZE);
+		res = initFrameResponse(incoming, obj->eoj, ECHOFRAME_MAXSIZE);
 	}
 	switch (esv) {
 	case ESV_SETC: //intentional fall through.
@@ -897,7 +898,17 @@ OBJ_PTR matchObjects(OBJMATCH_PTR matcher) {
 	return NULL;
 }
 
-void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead) {
+void * applyOutgoingHandler(HANDLER_PTR handler, ECHOFRAME_PTR outgoing) {
+	if (handler->func) {
+		return handler->func(handler, outgoing);
+	} else {
+		PPRINTF("aOH: null processor handler\n");
+		return NULL;
+	}
+}
+
+void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead,
+		HANDLER_PTR handler) {
 	if (parseFrame(incoming) != PR_OK) {
 		PPRINTF("bad echonet frame, dropping...");
 		return;
@@ -913,12 +924,17 @@ void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead) {
 		ECHOFRAME_PTR response = getPerObjectResponse(incoming,
 				matcher->lastmatch);
 		if (response) {
+			finalizeFrame(response);
+
 			//TODO do something with the response.
 			//SEND THEM over the wire
 			PPRINTF("pIF: created a response: \n");
-			dumpFrame(response);
-			//TODO: who frees the frame?
-			free(response);
+			if (handler) {
+				PPRINTF("pIF: applying handler\n");
+				applyOutgoingHandler(handler, response);
+			} else {
+				free(response);
+			}
 		}
 	}
 }

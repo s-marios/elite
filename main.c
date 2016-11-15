@@ -11,9 +11,11 @@
 #include "task.h"
 #include "esp8266.h"
 #include "esp/gpio.h"
-#include "elite.h"
+
 #include "minunit.h"
 #include "macrolist.h"
+#include "elite.h"
+#include "elite_priv.h"
 //#include "gdbstub.h"
 
 int tests_run = 0;
@@ -699,6 +701,165 @@ static char * test_computeClassesAndInstances() {
 	return 0;
 }
 
+void * outgoingTestProcessor(HANDLER_PTR handler, void * out) {
+	static uint8_t processorIndex = 0;
+	ECHOFRAME_PTR outgoing = (ECHOFRAME_PTR) out;
+	//store it in opt
+	ECHOFRAME_PTR * frames = (ECHOFRAME_PTR *) &handler->opt;
+	if (frames[processorIndex] != NULL) {
+		free(frames[processorIndex]);
+	}
+	frames[processorIndex] = outgoing;
+	processorIndex = (processorIndex + 1) % 8;
+	return 0;
+}
+
+HANDLER_PTR createTestHandler() {
+	size_t size = sizeof(HANDLER) + 8 * sizeof(ECHOFRAME_PTR);
+	HANDLER_PTR handler = malloc(size);
+	memset(handler, 0, size);
+	handler->func = outgoingTestProcessor;
+	return handler;
+}
+
+void destroyTestHandler(HANDLER_PTR handler) {
+	ECHOFRAME_PTR * frames = (ECHOFRAME_PTR *) &handler->opt;
+	for (int i = 0; i < 8; i++) {
+		if (frames[i] != NULL) {
+			free(frames[i]);
+		}
+	}
+	free(handler);
+}
+
+static char * test_processIncoming() {
+	OBJ_PTR profile = createNodeProfileObject();
+	char * eojs[] = { "\x01\x02\x01", "\x01\x02\x02", "\x03\x04\x05" };
+	OBJ_PTR objs[3];
+	for (int i = 0; i < 3; i++) {
+		objs[i] = createBasicObject(eojs[i]);
+		LAPPEND((void **) &profile, objs[i]);
+		computePropertyMaps(objs[i]);
+	}
+	computeNodeClassInstanceLists(profile);
+	Property_PTR property = NULL;
+
+	//create test handler
+	HANDLER_PTR handler = createTestHandler();
+
+	//create a request frame
+	int RTID = 512;
+	ECHOFRAME_PTR request = initFrame(48, RTID);
+	char * seoj = "\x04\x04\x04";
+	char * deoj = "\x01\x02\x00";
+	putEOJ(request, seoj);
+	putEOJ(request, deoj);
+	putESVnOPC(request, ESV_GET);
+	putEPC(request, 0x82, 0, NULL);
+	putEPC(request, 0x8A, 0, NULL);
+	finalizeFrame(request);
+
+	processIncomingFrame(request, profile, handler);
+
+	//time to do our tests
+	/***********
+	 * READS
+	 ***********/
+	PPRINTF("pIF reads\n");
+	ECHOFRAME_PTR * frames = &handler->opt;
+	int responses = 0;
+	for (int i = 0; i < 8; i++) {
+		if (frames[i] != NULL) {
+			responses++;
+		}
+	}
+	mu_assert("pIF: number of responses not 2", responses == 2);
+	char * responsedata = "\x82\x04\x00\x00H\00\x8A\x03AAA";
+	for (int i = 0; i < 8; i++) {
+		if (frames[i] != NULL) {
+			PPRINTF("pIF: %d-th iteration\n", i);
+			dumpFrame(frames[i]);
+			mu_assert("pIF: wrong TID", getTID(frames[i]) == RTID);
+			mu_assert("pIF: wrong deoj", CMPEOJ(getDEOJ(frames[i]), seoj) == 0);
+			mu_assert("pIF: wrong seoj",
+					CMPEOJ(getSEOJ(frames[i]), eojs[i]) == 0);
+			mu_assert("pIF: wrong ESV", getESV(frames[i]) == ESV_GETRES);
+			mu_assert("pIF: wrong OPC", getOPC(frames[i]) == 2);
+
+			mu_assert("pIF: sample data wrong",
+					memcmp(responsedata, getEPC(frames[i]), sizeof(responsedata)-1) == 0);
+		}
+	}
+
+	//introduce non-existent property
+	putEPC(request, 0xF1, 0, NULL);
+	finalizeFrame(request);
+	processIncomingFrame(request, profile, handler);
+	//responses at frames 2 & 3 i.e. offset 2
+	frames += 2;
+	responsedata = "\x82\x04\x00\x00H\00\x8A\x03AAA\xF1\x00";
+	for (int i = 0; i < 2; i++) {
+		dumpFrame(frames[i]);
+		mu_assert("pIF: success with non-existant property",
+				getESV(frames[i]) == ESV_GETC_SNA);
+		mu_assert("pIF (non-e): sample data wrong",
+				memcmp(responsedata, getEPC(frames[i]), sizeof(responsedata) -1) == 0);
+	}
+	free(request);
+
+	/*******
+	 * WRITES
+	 *******/
+	PPRINTF("pIF writes");
+	//add some writable properties for testing.
+	for (int i = 0; i < 2; i++) {
+		addProperty(objs[i],
+				createDataProperty(0xE0, E_READ | E_WRITE, 4, 0, NULL));
+	}
+	request = initFrame(48, RTID + 1);
+	putEOJ(request, seoj);
+	putEOJ(request, deoj);
+	putESVnOPC(request, ESV_SETC);
+	putEPC(request, 0xE0, 4, "TEST");
+	finalizeFrame(request);
+
+	responsedata = "\xE0\x00";
+	processIncomingFrame(request, profile, handler);
+	frames += 2;
+	for (int i = 0; i < 2; i++) {
+		dumpFrame(frames[i]);
+		mu_assert("pIF (write): sample data wrong",
+				memcmp(getEPC(frames[i]), responsedata, 2) == 0);
+		readProperty(getProperty(objs[i], 0xE0), 8, scratch);
+		mu_assert("pIF (write): written data mismatch",
+				memcmp(scratch, "TEST", 4) == 0);
+	}
+	//add non-existent property
+	putEPC(request, 0xFE, 4, "TAIL");
+	finalizeFrame(request);
+
+	responsedata = "\xE0\x00\xFE\x04TAIL";
+	processIncomingFrame(request, profile, handler);
+	frames += 2;
+	for (int i = 0; i < 2; i++) {
+		dumpFrame(frames[i]);
+		mu_assert("pIF (write fail): wrong ESV",
+				getESV(frames[i]) == ESV_SETC_SNA);
+		mu_assert("pIF (write fail): wrong data",
+				memcmp(getEPC(frames[i]), responsedata, 7) == 0);
+	}
+
+
+	free(request);
+	destroyTestHandler(handler);
+	FOREACH(profile, OBJ_PTR)
+	{
+		freeObject(element);
+	}
+
+	return 0;
+}
+
 static char * allTests() {
 	mu_run_test(test_PRINTF);
 	mu_run_test(test_malloc1);
@@ -720,6 +881,7 @@ static char * allTests() {
 	mu_run_test(test_propertyMaps);
 	mu_run_test(test_createNodeProfileObject);
 	mu_run_test(test_computeClassesAndInstances);
+	mu_run_test(test_processIncoming);
 	return 0;
 }
 
@@ -742,7 +904,7 @@ void runTestsTask(void * params) {
 
 void user_init(void) {
 	uart_set_baud(0, 115200);
-	//gdbstub_init();
+//gdbstub_init();
 	xTaskCreate(runTestsTask, (signed char * )"runTestsTask", 256, NULL, 2,
 			NULL);
 }

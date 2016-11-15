@@ -40,5 +40,7 @@ typedef int (*comparator)(void *, void *);
 void * LFIND(void * head, void * elem, comparator comp);
 void * LREPLACE(void ** head_ptr, void * oldelem, void * newelem);
 void * LGET(void * head, uint index);
+void LAPPEND(void ** head_ptr, void * elem);
+
 //file end
 #endif

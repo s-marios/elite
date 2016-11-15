@@ -156,6 +156,7 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 #define getDEOJ(x) &x->data[OFF_DEOJ]
 #define getESV(x) x->data[OFF_ESV]
 #define getOPC(x) x->data[OFF_OPC]
+#define getEPC(x) &x->data[OFF_EPC]
 
 /**
  * function type for read write operations
@@ -202,7 +203,7 @@ OBJ_PTR createObject(char * eoj);
 	} \
 } while (0)
 
-#define addProperty(obj_ptr, property) LAPPEND( &obj_ptr->pHead, property)
+#define addProperty(obj_ptr, property) LAPPEND((void **) &obj_ptr->pHead, property)
 
 int readProperty(Property_PTR property, uint8_t size, char * buf);
 int writeProperty(Property_PTR property, uint8_t size, char * buf);
