@@ -174,6 +174,7 @@ typedef enum {
 struct Property {
 	void * next;
 	void * opt;
+	OBJ_PTR pObj;
 	FREEFUNC freeptr;
 	READWRITE read;
 	READWRITE write;
@@ -191,7 +192,7 @@ struct OBJ {
 	Property_PTR pHead;
 	uint8_t eoj[3];
 };
-
+#define addObject( context, obj) LAPPEND(&context->oHead, obj)
 void freeObject(OBJ_PTR obj);
 OBJ_PTR createObject(char * eoj);
 #define setClassGroup(obj_ptr, val) (obj_ptr)->classgroup = val
@@ -203,7 +204,7 @@ OBJ_PTR createObject(char * eoj);
 	} \
 } while (0)
 
-#define addProperty(obj_ptr, property) LAPPEND((void **) &obj_ptr->pHead, property)
+void addProperty(OBJ_PTR obj, Property_PTR property);
 
 int readProperty(Property_PTR property, uint8_t size, char * buf);
 int writeProperty(Property_PTR property, uint8_t size, char * buf);

@@ -308,6 +308,11 @@ OBJ_PTR createObject(char * eoj) {
 	return obj;
 }
 
+void addProperty(OBJ_PTR obj, Property_PTR property) {
+	LAPPEND((void **) &obj->pHead, property);
+	property->pObj = obj;
+}
+
 int readProperty(Property_PTR property, uint8_t size, char * buf) {
 	if (property == NULL || property->read == NULL) {
 		return -1;
