@@ -28,6 +28,8 @@ void * handleOutgoingFrame(HANDLER_PTR handler, ECHOFRAME_PTR outgoing);
 void * applyOutgoingHandler(HANDLER_PTR handler, ECHOFRAME_PTR outgoing);
 void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead,
 		HANDLER_PTR handler);
+int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj,
+		E_WRITEMODE rwn);
 
 
 

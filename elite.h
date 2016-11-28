@@ -83,7 +83,7 @@ typedef enum {
 //#define E_ESV_OFFSET 10
 //#define E_OPC_OFFSET 11
 
-typedef char EOJ[3];
+typedef unsigned char EOJ[3];
 
 #define SETSUPERCLASS(x, scl) ((x[0]) = (scl))
 #define SETCLASS(x, cl) ((x[1]) = (cl))
@@ -102,7 +102,7 @@ ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID);
  *
  * reverses seoj/deoj of incoming packet
  */
-ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, char * eoj,
+ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char * eoj,
 		size_t alocsize);
 
 int putByte(ECHOFRAME_PTR fptr, char byte);

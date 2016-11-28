@@ -69,7 +69,7 @@ int putShort(ECHOFRAME_PTR fptr, uint16_t aShort) {
 }
 
 int putEOJ(ECHOFRAME_PTR fptr, EOJ eoj) {
-	return putBytes(fptr, 3, eoj);
+	return putBytes(fptr, 3, (char *) eoj);
 }
 
 int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, char * data) {
@@ -120,7 +120,7 @@ ESV getAffirmativeESV(ESV esv) {
 	return 0;
 }
 
-ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, char * eoj,
+ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char * eoj,
 		size_t alocsize) {
 	if (incoming == NULL) {
 		return NULL;
@@ -810,14 +810,15 @@ int processWrite(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj) {
 	return 0;
 }
 
-int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj) {
+int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj,
+		E_WRITEMODE rwn) {
 	static char readbuffer[ECHOFRAME_MAXSIZE];
 	static uint8_t readres;
 	PARSE_EPC parsedepc;
 	memset(&parsedepc, 0, sizeof(parsedepc));
 	while (getNextEPC(incoming, &parsedepc)) {
 		Property_PTR property = getProperty(obj, parsedepc.epc);
-		if (property) {
+		if (property && (property->rwn_mode & rwn)) {
 			readres = readProperty(property, ECHOFRAME_MAXSIZE, readbuffer);
 			if (readres > 0) {
 				//property exists and read succeeded
@@ -853,22 +854,18 @@ ECHOFRAME_PTR getPerObjectResponse(ECHOFRAME_PTR incoming, OBJ_PTR obj) {
 	}
 	switch (esv) {
 	case ESV_SETC: //intentional fall through.
-	case ESV_SETI: {
-		int writeres = processWrite(incoming, res, obj);
-		if (writeres < 0) { //set failed.
-			return res;
-		}
+	case ESV_SETI:
+		processWrite(incoming, res, obj);
 		break;
-	}
-	case ESV_GET: {
-		int readres = processRead(incoming, res, obj);
-		if (readres < 0) { //get failed.
-			return res;
-		}
+	case ESV_GET:
+		processRead(incoming, res, obj, E_READ);
 		break;
-	}
+	case ESV_INFREQ:
+		processRead(incoming, res, obj, E_NOTIFY | E_READ);
+		break;
 	case ESV_SETGET:
 		PPRINTF("TODO: SetGet not supported yet");
+		break;
 	default:
 		PPRINTF("pIF: Unrecognized ESV, doing nothing\n");
 	}

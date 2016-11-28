@@ -750,8 +750,8 @@ static char * test_processIncoming() {
 	//create a request frame
 	int RTID = 512;
 	ECHOFRAME_PTR request = initFrame(48, RTID);
-	char * seoj = "\x04\x04\x04";
-	char * deoj = "\x01\x02\x00";
+	unsigned char * seoj = (unsigned char *) "\x04\x04\x04";
+	unsigned char * deoj = (unsigned char *) "\x01\x02\x00";
 	putEOJ(request, seoj);
 	putEOJ(request, deoj);
 	putESVnOPC(request, ESV_GET);
@@ -766,7 +766,7 @@ static char * test_processIncoming() {
 	 * READS
 	 ***********/
 	PPRINTF("pIF reads\n");
-	ECHOFRAME_PTR * frames = &handler->opt;
+	ECHOFRAME_PTR * frames = (ECHOFRAME_PTR *) &handler->opt;
 	int responses = 0;
 	for (int i = 0; i < 8; i++) {
 		if (frames[i] != NULL) {
@@ -774,7 +774,7 @@ static char * test_processIncoming() {
 		}
 	}
 	mu_assert("pIF: number of responses not 2", responses == 2);
-	char * responsedata = "\x82\x04\x00\x00H\00\x8A\x03AAA";
+	char * responsedata = "\x82\x04\x00\x00" "H\00\x8A\x03" "AAA";
 	for (int i = 0; i < 8; i++) {
 		if (frames[i] != NULL) {
 			PPRINTF("pIF: %d-th iteration\n", i);
@@ -835,10 +835,10 @@ static char * test_processIncoming() {
 				memcmp(scratch, "TEST", 4) == 0);
 	}
 	//add non-existent property
-	putEPC(request, 0xFE, 4, "TAIL");
+	putEPC(request, 0xFE, 4, "FAIL");
 	finalizeFrame(request);
 
-	responsedata = "\xE0\x00\xFE\x04TAIL";
+	responsedata = "\xE0\x00\xFE\x04" "FAIL";
 	processIncomingFrame(request, profile, handler);
 	frames += 2;
 	for (int i = 0; i < 2; i++) {
