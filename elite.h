@@ -21,6 +21,12 @@
 #endif
 #endif
 
+/**
+ * For use with IP4_ADDR only.
+ */
+#define ELITE_MADDR 224, 0, 23, 0
+#define ELITE_PORT 3610
+
 //this is essentially forward declaration for the OBJ struct
 typedef struct OBJ OBJ;
 typedef struct OBJ * OBJ_PTR;

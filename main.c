@@ -12,6 +12,19 @@
 #include "esp8266.h"
 #include "esp/gpio.h"
 
+#include "lwip/api.h"
+#include "lwip/err.h"
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+#include "lwip/inet.h"
+#include "lwip/netif.h"
+
+//is this really necessary?
+#include "ipv4/lwip/ip.h"
+#include "lwip/sockets.h"
+
+#include "ssid_config.h"
+
 #include "minunit.h"
 #include "macrolist.h"
 #include "elite.h"
@@ -849,7 +862,6 @@ static char * test_processIncoming() {
 				memcmp(getEPC(frames[i]), responsedata, 7) == 0);
 	}
 
-
 	free(request);
 	destroyTestHandler(handler);
 	FOREACH(profile, OBJ_PTR)
@@ -902,9 +914,105 @@ void runTestsTask(void * params) {
 	}
 }
 
+#define WIFI_SSID "testnet"
+void eliteTask(void) {
+	int randint = rand();
+
+	printf("LWIP_IGMP: %c\n", ('0' + LWIP_IGMP));
+	printf("LWIP_SOCKET: %c\n", ('0' + LWIP_SOCKET));
+	printf("LWIP_NETCONN: %c\n", ('0' + LWIP_NETCONN));
+	printf("elite task started.");
+	printf("sdk version:%s\n", sdk_system_get_sdk_version());
+
+	struct sdk_station_config config = { .ssid = WIFI_SSID, .password =
+			"password", };
+	sdk_wifi_set_opmode(STATION_MODE);
+	sdk_wifi_station_set_config(&config);
+
+	printf("connecting to wifi");
+	while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) {
+		vTaskDelay(1000 / portTICK_RATE_MS);
+		printf(".");
+	}
+	printf("connected.");
+
+	/****** netif IGMP INIT *************/
+
+	//struct netif* netif = eagle_lwip_getif(STATION_IF);
+	struct netif* netif = netif_default;
+	PPRINTF("default netif is NULL? :%s\n", netif == NULL ? "yes" : "no");
+	if (NULL != netif) {
+
+		if (!(netif->flags & NETIF_FLAG_IGMP)) {
+			netif->flags |= NETIF_FLAG_IGMP;
+			igmp_start(netif);
+		}
+	}
+
+	int msock = socket(AF_INET, SOCK_DGRAM, 0);
+	PPRINTF("socket FD: %d\n", msock);
+
+//	uint16_t port = 3666;
+//	struct sockaddr_in sockaddr = {
+//			.sin_len = sizeof(struct ip_addr),
+//			.sin_family = AF_INET, .sin_port = ntohs(port),
+//	};
+	struct ip_info pinfo;
+	int res = sdk_wifi_get_ip_info(0, &pinfo);
+	PPRINTF("get_ip_info result: %d\n", res);
+	PPRINTF("ip address: %s\n", ip_ntoa(&pinfo.ip));
+	PPRINTF("gateway: %s\n", ip_ntoa(&pinfo.gw));
+	int optlen = 8;
+	uint8_t optval[optlen];
+
+	struct ip_addr dummy;
+	IP4_ADDR(&dummy, 224, 0, 23, 0);
+
+	/*********BIND ********/
+	struct sockaddr_in lsaddr;
+	memset(&lsaddr, 0, sizeof(lsaddr));
+	lsaddr.sin_addr.s_addr = pinfo.ip.addr;
+	lsaddr.sin_family = AF_INET;
+	lsaddr.sin_port = ntohs(ELITE_PORT);
+	res = bind(msock, &lsaddr, sizeof(lsaddr));
+	PPRINTF("Bind result: %d\n");
+
+	/*********MULTICAST*************/
+	struct ip_mreq ipmreq;
+	ipmreq.imr_multiaddr.s_addr = dummy.addr;
+	ipmreq.imr_interface.s_addr = pinfo.ip.addr;
+
+	res = setsockopt(msock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &ipmreq,
+			sizeof(ipmreq));
+	if (res < 0) {
+		PPRINTF("setsockopt FAILED.\n");
+	}
+	PPRINTF("multicast setsockopt result: %d\n", res);
+	//netconn_join_leave_group(NULL, NULL, NULL, 1);
+	//netconn_accept(NULL, NULL);
+	//in_addr VS ip_addr saga: the later is lwip stuff.
+
+	//bind(msock, )
+	struct sockaddr_in multicast;
+	multicast.sin_addr.s_addr = dummy.addr;
+	multicast.sin_family = AF_INET;
+	//is the next necessary?
+	//multicast.sin_len = sizeof(???)
+	multicast.sin_port = ntohs(ELITE_PORT);
+
+	const char data[] = "TEST";
+	while (1) {
+		vTaskDelay(3000 / portTICK_RATE_MS);
+		printf("*");
+		sendto(msock, data, sizeof(data), 0, (struct sockaddr * ) &multicast,
+				sizeof(multicast));
+	}
+}
+
 void user_init(void) {
 	uart_set_baud(0, 115200);
 //gdbstub_init();
 	xTaskCreate(runTestsTask, (signed char * )"runTestsTask", 256, NULL, 2,
 			NULL);
+	xTaskCreate(eliteTask, (signed char * )"eliteTask", 256, NULL, 1, NULL);
 }
