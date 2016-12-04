@@ -340,8 +340,8 @@ static char * test_testProperty() {
 	Property_PTR property = malloc(sizeof(Property));
 	initTestProperty(property);
 	mu_assert("testProperty: read is not test read",
-			property->read == testRead);
-	mu_assert("testProperty: write is not NULL", property->write == NULL);
+			property->readf == testRead);
+	mu_assert("testProperty: write is not NULL", property->writef == NULL);
 	mu_assert("testProperty: opcode is not 0x80", property->propcode == 0x80);
 	mu_assert("testProperty: next is not NULL", property->next == NULL);
 	int res = readProperty(property, 16, buf);
@@ -915,15 +915,8 @@ void runTestsTask(void * params) {
 }
 
 #define WIFI_SSID "testnet"
-void eliteTask(void) {
-	int randint = rand();
 
-	printf("LWIP_IGMP: %c\n", ('0' + LWIP_IGMP));
-	printf("LWIP_SOCKET: %c\n", ('0' + LWIP_SOCKET));
-	printf("LWIP_NETCONN: %c\n", ('0' + LWIP_NETCONN));
-	printf("elite task started.");
-	printf("sdk version:%s\n", sdk_system_get_sdk_version());
-
+void setupWirelessIF() {
 	struct sdk_station_config config = { .ssid = WIFI_SSID, .password =
 			"password", };
 	sdk_wifi_set_opmode(STATION_MODE);
@@ -949,21 +942,23 @@ void eliteTask(void) {
 		}
 	}
 
+}
+
+int createMulticastSocket() {
+	//create socket
 	int msock = socket(AF_INET, SOCK_DGRAM, 0);
 	PPRINTF("socket FD: %d\n", msock);
 
-//	uint16_t port = 3666;
-//	struct sockaddr_in sockaddr = {
-//			.sin_len = sizeof(struct ip_addr),
-//			.sin_family = AF_INET, .sin_port = ntohs(port),
-//	};
+	if (msock < 0) {
+		return msock;
+	}
+	//get local if address
 	struct ip_info pinfo;
 	int res = sdk_wifi_get_ip_info(0, &pinfo);
 	PPRINTF("get_ip_info result: %d\n", res);
 	PPRINTF("ip address: %s\n", ip_ntoa(&pinfo.ip));
 	PPRINTF("gateway: %s\n", ip_ntoa(&pinfo.gw));
 	int optlen = 8;
-	uint8_t optval[optlen];
 
 	struct ip_addr dummy;
 	IP4_ADDR(&dummy, 224, 0, 23, 0);
@@ -984,29 +979,41 @@ void eliteTask(void) {
 
 	res = setsockopt(msock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &ipmreq,
 			sizeof(ipmreq));
-	if (res < 0) {
-		PPRINTF("setsockopt FAILED.\n");
-	}
 	PPRINTF("multicast setsockopt result: %d\n", res);
-	//netconn_join_leave_group(NULL, NULL, NULL, 1);
-	//netconn_accept(NULL, NULL);
-	//in_addr VS ip_addr saga: the later is lwip stuff.
 
-	//bind(msock, )
-	struct sockaddr_in multicast;
-	multicast.sin_addr.s_addr = dummy.addr;
-	multicast.sin_family = AF_INET;
-	//is the next necessary?
-	//multicast.sin_len = sizeof(???)
-	multicast.sin_port = ntohs(ELITE_PORT);
+	return msock;
+}
 
-	const char data[] = "TEST";
-	while (1) {
-		vTaskDelay(3000 / portTICK_RATE_MS);
-		printf("*");
-		sendto(msock, data, sizeof(data), 0, (struct sockaddr * ) &multicast,
-				sizeof(multicast));
-	}
+//void startReceivingLoop(ECHOCTRL_PTR ectrl) {
+//	xTaskCreate(receiveLoop, (signed char * ) "eliteReceiveLoop", 256, ectrl, 1,
+//			NULL);
+//}
+
+
+void eliteTask(void) {
+	int randint = rand();
+
+	printf("LWIP_IGMP: %c\n", ('0' + LWIP_IGMP));
+	printf("LWIP_SOCKET: %c\n", ('0' + LWIP_SOCKET));
+	printf("LWIP_NETCONN: %c\n", ('0' + LWIP_NETCONN));
+	printf("elite task started.");
+	printf("sdk version:%s\n", sdk_system_get_sdk_version());
+
+	setupWirelessIF();
+	int msock = createMulticastSocket();
+
+	//setup our control struct.
+	ECHOCTRL_PTR ectrl = createEchonetControl();
+	ectrl->msock = msock;
+
+	receiveLoop(ectrl);
+//	const char data[] = "TEST";
+//	while (1) {
+//		vTaskDelay(3000 / portTICK_RATE_MS);
+//		printf("*");
+//		sendto(ectrl->msock, data, sizeof(data), 0,
+//				(struct sockaddr * ) &ectrl->maddr, sizeof(struct sockaddr_in));
+//	}
 }
 
 void user_init(void) {

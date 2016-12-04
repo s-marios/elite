@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "lwip/sockets.h"
 /*
  * Debug printfs
  */
@@ -35,12 +36,37 @@ typedef struct OBJ * OBJ_PTR;
 typedef struct Property Property;
 typedef struct Property * Property_PTR;
 
+//this is essentially forward declaration for the handler struct
+typedef struct HANDLER HANDLER;
+typedef struct HANDLER * HANDLER_PTR;
+/**
+ * definition of the function that processes outgoing frames. This handler
+ * is responsible for freeing the outgoing packet. Optional arguments to this
+ * can be found in handler->opt.
+ */
+typedef void * (*PROCESSORFUNC)(HANDLER_PTR handler, void * outgoing);
+
+struct HANDLER {
+	PROCESSORFUNC func;
+	void * opt;
+};
+
+
 /**
  * This is the overall control structure for ECHONET Lite operations
  */
 typedef struct {
+	int msock;
+	struct sockaddr_in maddr; /**< echonet lite multicast addr **/
+	struct sockaddr_in incoming;
+
 	uint16_t TID;
 	OBJ_PTR oHead;
+	struct HANDLER sendHandler;
+
+#define ECHOCTRL_BUFSIZE 128
+	char buffer[ECHOCTRL_BUFSIZE];
+
 } ECHOCTRL, *ECHOCTRL_PTR;
 
 ECHOCTRL_PTR createEchonetControl();
@@ -101,8 +127,10 @@ typedef unsigned char EOJ[3];
 #define CMPEOJ(x, y) memcmp(x, y, 3)
 
 ECHOFRAME_PTR allocateFrame(size_t alocsize);
+ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, char * data, size_t length);
 ECHOFRAME_PTR initFrameDepr(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID);
 ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID);
+#define freeFrame(frame) free(frame)
 /**
  * creates a simple response frame.
  *
@@ -182,8 +210,8 @@ struct Property {
 	void * opt;
 	OBJ_PTR pObj;
 	FREEFUNC freeptr;
-	READWRITE read;
-	READWRITE write;
+	READWRITE readf;
+	READWRITE writef;
 	uint8_t propcode;
 	uint8_t rwn_mode;
 };
@@ -283,4 +311,5 @@ typedef struct {
 } OBJMATCH, *OBJMATCH_PTR;
 OBJ_PTR matchObjects(OBJMATCH_PTR matcher);
 
+void receiveLoop(ECHOCTRL_PTR ectrl);
 #endif

@@ -21,6 +21,18 @@ ECHOFRAME_PTR allocateFrame(size_t alocsize) {
 	}
 	return fptr;
 }
+
+ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, char * data, size_t length) {
+	if (frame == NULL) {
+		return NULL;
+	}
+	frame->data = data;
+	frame->used = length;
+	frame->allocated = 0;
+	frame->propNum = 0;
+	return frame;
+}
+
 uint16_t incTID(ECHOCTRL_PTR cptr) {
 	uint16_t result = cptr->TID;
 	cptr->TID++;
@@ -32,7 +44,16 @@ uint16_t incTID(ECHOCTRL_PTR cptr) {
 
 ECHOCTRL_PTR createEchonetControl() {
 	ECHOCTRL_PTR ecptr = malloc(sizeof(ECHOCTRL));
+	memset(ecptr, 0, sizeof(ECHOCTRL));
 	ecptr->TID = 1;
+	struct ip_addr dummy;
+	IP4_ADDR(&dummy, 224, 0, 23, 0);
+
+	ecptr->maddr.sin_addr.s_addr = dummy.addr;
+	ecptr->maddr.sin_family = AF_INET;
+	ecptr->maddr.sin_port = ntohs(ELITE_PORT);
+	//for safety?
+	ecptr->maddr.sin_len = 0;
 	return ecptr;
 }
 
@@ -314,22 +335,22 @@ void addProperty(OBJ_PTR obj, Property_PTR property) {
 }
 
 int readProperty(Property_PTR property, uint8_t size, char * buf) {
-	if (property == NULL || property->read == NULL) {
+	if (property == NULL || property->readf == NULL) {
 		return -1;
 	} else if (buf == NULL) {
 		return -2;
 	} else {
-		return property->read(property, size, buf);
+		return property->readf(property, size, buf);
 	}
 }
 
 int writeProperty(Property_PTR property, uint8_t size, char * buf) {
-	if (property == NULL || property->write == NULL) {
+	if (property == NULL || property->writef == NULL) {
 		return -1;
 	} else if (buf == NULL) {
 		return -2;
 	} else {
-		return property->write(property, size, buf);
+		return property->writef(property, size, buf);
 	}
 }
 
@@ -396,7 +417,7 @@ void initTestProperty(Property_PTR property) {
 		return;
 	memset(property, 0, sizeof(Property));
 	property->propcode = 0x80;
-	property->read = testRead;
+	property->readf = testRead;
 }
 
 typedef struct {
@@ -478,13 +499,13 @@ Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 	//access to them is available internally.
 	//if (rwn & E_WRITE) {
 	if (datasize < maxsize) {
-		property->write = writeData;
+		property->writef = writeData;
 	} else if (datasize == maxsize) {
-		property->write = writeDataExact;
+		property->writef = writeDataExact;
 	}
 	//}
 	//if (rwn & E_READ) {
-	property->read = readData;
+	property->readf = readData;
 	//}
 	return property;
 }
@@ -641,14 +662,15 @@ OBJ_PTR createNodeProfileObject() {
 	addProperty(node,
 			createDataProperty(0x83, E_READ, 17, 17,
 					"\x31\x32\x33\x34\x35\x36\x37\x38\x39\x30\x31\x32\x33\x34\x35\x36\x37"));
-	addProperty(node, createDataProperty(0xD3, E_READ | E_NOTIFY, 3, 0, NULL ));
-	addProperty(node, createDataProperty(0xD4, E_READ | E_NOTIFY, 2, 0, NULL ));
+	addProperty(node, createDataProperty(0xD3, E_READ | E_NOTIFY, 3, 0, NULL));
+	addProperty(node, createDataProperty(0xD4, E_READ | E_NOTIFY, 2, 0, NULL));
 	addProperty(node,
-			createDataProperty(0xD5, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0, NULL ));
+			createDataProperty(0xD5, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0,
+			NULL));
 	addProperty(node,
-			createDataProperty(0xD6, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0, NULL ));
-	addProperty(node,
-			createDataProperty(0xD7, E_READ | E_NOTIFY, 17, 0, NULL ));
+			createDataProperty(0xD6, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0,
+			NULL));
+	addProperty(node, createDataProperty(0xD7, E_READ | E_NOTIFY, 17, 0, NULL));
 	return node;
 }
 
@@ -938,5 +960,45 @@ void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead,
 				free(response);
 			}
 		}
+	}
+}
+
+typedef struct {
+	struct sockaddr_in * dst;
+	ECHOCTRL_PTR ectrl;
+} DEFAULTOUT, *DEFAULTOUT_PTR;
+
+PROCESSORFUNC defaultOut(HANDLER_PTR handler, void * outgoing) {
+	DEFAULTOUT_PTR dout = (DEFAULTOUT_PTR) handler->opt;
+	ECHOFRAME_PTR outframe = (ECHOFRAME_PTR) outgoing;
+	sendto(dout->ectrl->msock, outframe->data, outframe->used, 0, dout->dst,
+			sizeof(struct sockaddr_in));
+	freeFrame(outframe);
+	return NULL;
+}
+
+void receiveLoop(ECHOCTRL_PTR ectrl) {
+	for (;;) {
+		int res = recvfrom(ectrl->msock, ectrl->buffer, ECHOCTRL_BUFSIZE, 0,
+				&ectrl->incoming, sizeof(struct sockaddr_in));
+		PPRINTF("rL: received UDP packet\n");
+		if (res < -1) {
+			PPRINTF("recvfrom error\n");
+		}
+
+		ECHOFRAME frame;
+		wrapDataIntoFrame(&frame, ectrl->buffer, res);
+
+		HANDLER handler;
+		DEFAULTOUT defaultOutArgs;
+
+		handler.func = defaultOut;
+		handler.opt = &defaultOutArgs;
+
+		defaultOutArgs.dst = &ectrl->incoming;
+		defaultOutArgs.ectrl = ectrl;
+
+		processIncomingFrame(&frame, ectrl->oHead, &handler);
+
 	}
 }
