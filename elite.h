@@ -225,10 +225,13 @@ struct OBJ {
 	int i; /*!< this was used for tests */
 	Property_PTR pHead;
 	uint8_t eoj[3];
+	ECHOCTRL_PTR ectrl;
 };
-#define addObject( context, obj) LAPPEND(&context->oHead, obj)
+
 void freeObject(OBJ_PTR obj);
 OBJ_PTR createObject(char * eoj);
+void addObject(ECHOCTRL_PTR ectrl, OBJ_PTR obj);
+
 #define setClassGroup(obj_ptr, val) (obj_ptr)->classgroup = val
 #define setClass(obj_ptr, val) (obj_ptr)->class = val
 #define setInstance(obj_ptr, val) (obj_ptr)->instance = val
@@ -239,6 +242,8 @@ OBJ_PTR createObject(char * eoj);
 } while (0)
 
 void addProperty(OBJ_PTR obj, Property_PTR property);
+void makeNotification(Property_PTR property);
+
 
 int readProperty(Property_PTR property, uint8_t size, char * buf);
 int writeProperty(Property_PTR property, uint8_t size, char * buf);

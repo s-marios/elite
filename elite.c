@@ -329,6 +329,11 @@ OBJ_PTR createObject(char * eoj) {
 	return obj;
 }
 
+void addObject(ECHOCTRL_PTR ectrl, OBJ_PTR obj) {
+	LAPPEND(&ectrl->oHead, obj);
+	obj->ectrl = ectrl;
+}
+
 void addProperty(OBJ_PTR obj, Property_PTR property) {
 	LAPPEND((void **) &obj->pHead, property);
 	property->pObj = obj;
@@ -975,6 +980,18 @@ PROCESSORFUNC defaultOut(HANDLER_PTR handler, void * outgoing) {
 			sizeof(struct sockaddr_in));
 	freeFrame(outframe);
 	return NULL;
+}
+
+void makeNotification(Property_PTR property) {
+	ECHOCTRL_PTR ectrl = property->pObj->ectrl;
+	//send a packet with the data from property
+	char * buf = malloc(256);
+	int charread = readProperty(property, 256, buf);
+	if (charread > 0) {
+		sendto(ectrl->msock, buf, charread, 0, ectrl->maddr,
+				sizeof(struct sockaddr_in));
+	}
+	free(buf);
 }
 
 void receiveLoop(ECHOCTRL_PTR ectrl) {
