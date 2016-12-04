@@ -990,6 +990,21 @@ int createMulticastSocket() {
 //}
 
 
+void setupObjects(ECHOCTRL_PTR ectrl) {
+	OBJ_PTR profile = createNodeProfileObject();
+	addObject(ectrl, profile);
+
+	OBJ_PTR testobj = createBasicObject("\x00\x01\x02");
+	addProperty(testobj,
+			createDataProperty(0xF0, E_READ | E_WRITE | E_NOTIFY, 8, 0, NULL));
+	addProperty(testobj,
+			createDataProperty(0xF1, E_READ | E_NOTIFY, 4, 4, "TEST"));
+	computePropertyMaps(testobj);
+	computePropertyMaps(profile);
+
+	computeNodeClassInstanceLists(ectrl->oHead);
+}
+
 void eliteTask(void) {
 	int randint = rand();
 
@@ -1005,6 +1020,8 @@ void eliteTask(void) {
 	//setup our control struct.
 	ECHOCTRL_PTR ectrl = createEchonetControl();
 	ectrl->msock = msock;
+
+	setupObjects(ectrl);
 
 	receiveLoop(ectrl);
 //	const char data[] = "TEST";

@@ -985,12 +985,24 @@ PROCESSORFUNC defaultOut(HANDLER_PTR handler, void * outgoing) {
 void makeNotification(Property_PTR property) {
 	ECHOCTRL_PTR ectrl = property->pObj->ectrl;
 	//send a packet with the data from property
-	char * buf = malloc(256);
-	int charread = readProperty(property, 256, buf);
+	ECHOFRAME_PTR nframe = initFrame(128, incTID(ectrl));
+	putEOJ(nframe, property->pObj->eoj);
+	putEOJ(nframe, PROFILEEOJ);
+	putESVnOPC(nframe, ESV_INF);
+
+
+	char * buf = malloc(128);
+	int charread = readProperty(property, 128, buf);
 	if (charread > 0) {
-		sendto(ectrl->msock, buf, charread, 0, ectrl->maddr,
-				sizeof(struct sockaddr_in));
+		putEPC(nframe, property->propcode, charread, buf);
+		finalizeFrame(nframe);
+
+		sendto(ectrl->msock, nframe->data, nframe->used, 0,
+				(const struct sockaddr * ) &ectrl->maddr,
+				sizeof(struct sockaddr));
 	}
+
+	freeFrame(nframe);
 	free(buf);
 }
 
