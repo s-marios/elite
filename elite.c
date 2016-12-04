@@ -642,7 +642,7 @@ OBJ_PTR createBasicObject(char * eoj) {
 			createDataProperty(0x81, E_READ | E_WRITE | E_NOTIFY, 1, 1, NULL));
 	addProperty(base, createDataProperty(0x82, E_READ, 4, 4, "\0\0H\0"));
 	addProperty(base,
-			createDataProperty(0x88, E_READ | E_NOTIFY, 1, 1, "\x41"));
+			createDataProperty(0x88, E_READ | E_NOTIFY, 1, 1, "\x42"));
 	addProperty(base, createDataProperty(0x8A, E_READ, 3, 3, "AAA"));
 	addProperty(base, createDataProperty(0x9D, E_READ | E_NOTIFY, 17, 0, NULL));
 	addProperty(base, createDataProperty(0x9E, E_READ | E_NOTIFY, 17, 0, NULL));
@@ -973,7 +973,7 @@ typedef struct {
 	ECHOCTRL_PTR ectrl;
 } DEFAULTOUT, *DEFAULTOUT_PTR;
 
-PROCESSORFUNC defaultOut(HANDLER_PTR handler, void * outgoing) {
+void * defaultOut(HANDLER_PTR handler, void * outgoing) {
 	DEFAULTOUT_PTR dout = (DEFAULTOUT_PTR) handler->opt;
 	ECHOFRAME_PTR outframe = (ECHOFRAME_PTR) outgoing;
 	sendto(dout->ectrl->msock, outframe->data, outframe->used, 0, dout->dst,
@@ -990,7 +990,6 @@ void makeNotification(Property_PTR property) {
 	putEOJ(nframe, PROFILEEOJ);
 	putESVnOPC(nframe, ESV_INF);
 
-
 	char * buf = malloc(128);
 	int charread = readProperty(property, 128, buf);
 	if (charread > 0) {
@@ -1001,15 +1000,16 @@ void makeNotification(Property_PTR property) {
 				(const struct sockaddr * ) &ectrl->maddr,
 				sizeof(struct sockaddr));
 	}
-
 	freeFrame(nframe);
 	free(buf);
 }
 
 void receiveLoop(ECHOCTRL_PTR ectrl) {
 	for (;;) {
+		PPRINTF("R");
+		socklen_t addrlen = sizeof(struct sockaddr_in);
 		int res = recvfrom(ectrl->msock, ectrl->buffer, ECHOCTRL_BUFSIZE, 0,
-				&ectrl->incoming, sizeof(struct sockaddr_in));
+				&ectrl->incoming, &addrlen);
 		PPRINTF("rL: received UDP packet\n");
 		if (res < -1) {
 			PPRINTF("recvfrom error\n");
@@ -1027,6 +1027,7 @@ void receiveLoop(ECHOCTRL_PTR ectrl) {
 		defaultOutArgs.dst = &ectrl->incoming;
 		defaultOutArgs.ectrl = ectrl;
 
+		PPRINTF("i");
 		processIncomingFrame(&frame, ectrl->oHead, &handler);
 
 	}
