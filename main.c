@@ -29,6 +29,7 @@
 #include "macrolist.h"
 #include "elite.h"
 #include "elite_priv.h"
+#include "madapter.h"
 //#include "gdbstub.h"
 
 int tests_run = 0;
@@ -868,7 +869,7 @@ static char * test_processIncoming() {
 	{
 		freeObject(element);
 	}
-
+	printf("test");
 	return 0;
 }
 

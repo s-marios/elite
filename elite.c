@@ -54,6 +54,7 @@ ECHOCTRL_PTR createEchonetControl() {
 	ecptr->maddr.sin_port = ntohs(ELITE_PORT);
 	//for safety?
 	ecptr->maddr.sin_len = 0;
+	ecptr->msock = -1;
 	return ecptr;
 }
 
@@ -82,6 +83,7 @@ int putByte(ECHOFRAME_PTR fptr, char byte) {
 int putShort(ECHOFRAME_PTR fptr, uint16_t aShort) {
 	if (checkSize(fptr, 2))
 		return -1;
+	//kind of a WTF, it'll bite us if we move to big endian machines
 	ECHOFRAME_HEAD(fptr) = aShort >> 8;
 	fptr->used++;
 	ECHOFRAME_HEAD(fptr) = ((char) (0x00ff & aShort));
@@ -355,7 +357,12 @@ int writeProperty(Property_PTR property, uint8_t size, char * buf) {
 	} else if (buf == NULL) {
 		return -2;
 	} else {
-		return property->writef(property, size, buf);
+		//TODO better: schedule the notification for later
+		int result = property->writef(property, size, buf);
+		if (property->rwn_mode & E_NOTIFY) {
+			makeNotification(property);
+		}
+		return result;
 	}
 }
 
@@ -984,6 +991,9 @@ void * defaultOut(HANDLER_PTR handler, void * outgoing) {
 
 void makeNotification(Property_PTR property) {
 	ECHOCTRL_PTR ectrl = property->pObj->ectrl;
+	if (!ectrl || ectrl->msock < 0) {
+		return;
+	}
 	//send a packet with the data from property
 	ECHOFRAME_PTR nframe = initFrame(128, incTID(ectrl));
 	putEOJ(nframe, property->pObj->eoj);
