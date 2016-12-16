@@ -9,6 +9,7 @@
 #include "esp/uart.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 #include "esp8266.h"
 #include "esp/gpio.h"
 
@@ -35,12 +36,21 @@
 int tests_run = 0;
 char scratch[128];
 
+//net logging declarations
+xSemaphoreHandle debugsem;
+char ndbuf[256];
+uint8_t ndsize;
+
+
+
+
+
 static char * test_PRINTF() {
-#ifdef ELITE_DEBUG
-	mu_assert("PRINTF: did not print", PRINTF("hello!") == 6);
-#else
-	PRINTF("hello!");
-#endif
+//#ifdef ELITE_DEBUG
+//	mu_assert("PRINTF: did not print", PRINTF("hello!") == 6);
+//#else
+//	PRINTF("hello!");
+//#endif
 	return 0;
 }
 
@@ -94,8 +104,8 @@ static char * test_initFrame() {
 	mu_assert("frame init failed", frame != NULL);
 	mu_assert("frame header invalid byte 1", frame->data[0] == E_HD1);
 	mu_assert("frame header invalid byte 1", frame->data[1] == E_HD2);
-	printf("getShort result: %d \n", getShort(frame, 2));
-	printf("first four bytes: %x %x %x %x\n", frame->data[0], frame->data[1],
+	PPRINTF("getShort result: %d \n", getShort(frame, 2));
+	PPRINTF("first four bytes: %x %x %x %x\n", frame->data[0], frame->data[1],
 			frame->data[2], frame->data[3]);
 
 	mu_assert("frame TID invalid", getShort(frame, 2) == 1);
@@ -207,7 +217,7 @@ static char * test_parseFrame() {
 			parseFrame(frame) == PR_TOOSHORT);
 	putEPC(frame, 0x80, 0, NULL);
 	int result = parseFrame(frame);
-	//printf("parse shortest frame result: %d opc:%d\n", result, frame->propNum);
+	//PPRINTF("parse shortest frame result: %d opc:%d\n", result, frame->propNum);
 	//have not called frame finalizer!
 	mu_assert("parseFrame: opc zero detection failed", result == PR_OPCZERO);
 
@@ -239,7 +249,7 @@ static char * test_parseFrame() {
 
 	mu_assert("parseFrame: created frame propNum is not 4",
 			frame->propNum == 4);
-	printf("frame size: %d\n", frame->used);
+	PPRINTF("frame size: %d\n", frame->used);
 	mu_assert("parseFrame: created frame lenght not 31", frame->used == 31);
 	mu_assert("parseFrame: created frame parse not OK",
 			parseFrame(frame) == PR_OK);
@@ -273,7 +283,7 @@ static char * test_getNextEPC() {
 
 	int i = 0;
 	while (getNextEPC(frame, prop_ptr)) {
-		printf("getNextEPC repetition: %d\n", i);
+		PPRINTF("getNextEPC repetition: %d\n", i);
 		mu_assert("getNextEPC epc not match", prop_ptr->epc == propcodes[i]);
 		mu_assert("getNextEPC pdc not match", prop_ptr->pdc == i + 1);
 		mu_assert("getNextEPC edt not match",
@@ -869,7 +879,7 @@ static char * test_processIncoming() {
 	{
 		freeObject(element);
 	}
-	printf("test");
+
 	return 0;
 }
 
@@ -900,18 +910,18 @@ static char * allTests() {
 
 void runTestsTask(void * params) {
 	void * malloced = malloc(1);
-	printf("is malloced? : %s ", malloced ? "true" : "false");
-	printf("Sizeof ECHOFRAME: %d\n", sizeof(ECHOFRAME));
-	printf("running tests... \n");
+	PPRINTF("is malloced? : %s ", malloced ? "true" : "false");
+	PPRINTF("Sizeof ECHOFRAME: %d\n", sizeof(ECHOFRAME));
+	PPRINTF("running tests... \n");
 	char * result = allTests();
 	if (result != 0) {
-		printf("%s\n", result);
+		PPRINTF("%s\n", result);
 	} else {
-		printf("ALL TESTS PASSED.");
+		PPRINTF("ALL TESTS PASSED.");
 	}
 	while (1) {
 		vTaskDelay(1000 / portTICK_RATE_MS);
-		printf(".");
+		PPRINTF(".");
 	}
 }
 
@@ -923,12 +933,12 @@ void setupWirelessIF() {
 	sdk_wifi_set_opmode(STATION_MODE);
 	sdk_wifi_station_set_config(&config);
 
-	printf("connecting to wifi");
+	PPRINTF("connecting to wifi");
 	while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) {
 		vTaskDelay(1000 / portTICK_RATE_MS);
-		printf(".");
+		PPRINTF(".");
 	}
-	printf("connected.");
+	PPRINTF("connected.");
 
 	/****** netif IGMP INIT *************/
 
@@ -943,6 +953,25 @@ void setupWirelessIF() {
 		}
 	}
 
+}
+
+int createDebugSocket() {
+	int dsock = socket(AF_INET, SOCK_STREAM, 0);
+	if (dsock < 0) {
+		return dsock;
+	}
+
+	struct sockaddr_in saddr;
+	memset(&saddr, 0, sizeof(struct sockaddr_in));
+	saddr.sin_addr.s_addr = INADDR_ANY;
+	saddr.sin_family = AF_INET;
+	saddr.sin_port = ntohs(6666);
+	int res = bind(dsock, &saddr, sizeof(saddr));
+	PPRINTF("Bind result: %d\n", res);
+	if (res < 0) {
+		return res;
+	}
+	return dsock;
 }
 
 int createMulticastSocket() {
@@ -990,7 +1019,6 @@ int createMulticastSocket() {
 //			NULL);
 //}
 
-
 void setupObjects(ECHOCTRL_PTR ectrl) {
 	OBJ_PTR profile = createNodeProfileObject();
 
@@ -1009,11 +1037,11 @@ void setupObjects(ECHOCTRL_PTR ectrl) {
 void eliteTask(void) {
 	int randint = rand();
 
-	printf("LWIP_IGMP: %c\n", ('0' + LWIP_IGMP));
-	printf("LWIP_SOCKET: %c\n", ('0' + LWIP_SOCKET));
-	printf("LWIP_NETCONN: %c\n", ('0' + LWIP_NETCONN));
-	printf("elite task started.");
-	printf("sdk version:%s\n", sdk_system_get_sdk_version());
+	PPRINTF("LWIP_IGMP: %c\n", ('0' + LWIP_IGMP));
+	PPRINTF("LWIP_SOCKET: %c\n", ('0' + LWIP_SOCKET));
+	PPRINTF("LWIP_NETCONN: %c\n", ('0' + LWIP_NETCONN));
+	PPRINTF("elite task started.");
+	PPRINTF("sdk version:%s\n", sdk_system_get_sdk_version());
 
 	setupWirelessIF();
 	int msock = createMulticastSocket();
@@ -1032,16 +1060,81 @@ void eliteTask(void) {
 //	const char data[] = "TEST";
 //	while (1) {
 //		vTaskDelay(3000 / portTICK_RATE_MS);
-//		printf("*");
+//		PPRINTF("*");
 //		sendto(ectrl->msock, data, sizeof(data), 0,
 //				(struct sockaddr * ) &ectrl->maddr, sizeof(struct sockaddr_in));
 //	}
 }
 
+void netDebugTask(void) {
+
+	int sock = createDebugSocket();
+	if (sock < 0) {
+		PPRINTF("netDebugTask: failed to setup debug port. Exit.\n");
+		return;
+	}
+	int res = listen(sock, 1);
+	if (res < 0) {
+		PPRINTF("netDebugTask: listen failed. Exit.\n");
+		return;
+	}
+
+	//time to setup our semaphore
+	debugsem = xSemaphoreCreateMutex();
+	if (debugsem == NULL) {
+		PPRINTF("debug mutex creation fail\n");
+	} else {
+		PPRINTF("debug mutex creation success\n");
+	}
+
+	//endless sleep
+	PPRINTF("netDebugTask: Acquiring semaphore..");
+	xSemaphoreTake(debugsem, portMAX_DELAY);
+	PPRINTF("Done!\n");
+
+	struct sockaddr_in clientaddr;
+	socklen_t size = sizeof(clientaddr);
+	memset(&clientaddr, 0, size);
+	static char greeting[] = "Hello, hope this helps!\n";
+	do {
+		int clientfd = accept(sock, &clientaddr, &size);
+		write(clientfd, greeting, sizeof(greeting));
+
+		int writeres = 0;
+		while (writeres >= 0) {
+			//sleep forever
+			xSemaphoreTake(debugsem, portMAX_DELAY);
+			writeres = write(clientfd, ndbuf, ndsize);
+		}
+		close(clientfd);
+	} while (1);
+
+}
+
+void testPeriodic(void) {
+	int i = 0;
+	while (1) {
+		vTaskDelay(3000 / portTICK_RATE_MS);
+		PPRINTF("looping... %d\n", ++i)
+		;
+
+	}
+}
+
 void user_init(void) {
 	uart_set_baud(0, 115200);
 //gdbstub_init();
+
+	//set debug sem to null
+	debugsem = NULL;
+
+
 	xTaskCreate(runTestsTask, (signed char * )"runTestsTask", 256, NULL, 2,
 			NULL);
+
+	xTaskCreate(netDebugTask, (signed char * )"netDebugTask", 256, NULL, 2,
+			NULL);
 	xTaskCreate(eliteTask, (signed char * )"eliteTask", 256, NULL, 1, NULL);
+	xTaskCreate(testPeriodic, (signed char * ) "testPeriodic", 256, NULL, 1,
+			NULL);
 }

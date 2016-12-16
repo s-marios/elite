@@ -12,15 +12,56 @@
 
 #define PRINTF
 #define PPRINTF
+#define DOWEBLOG
+
+#ifdef DOWEBLOG
+#include "FreeRTOS.h"
+#include "semphr.h"
+
+extern uint8_t ndsize;
+extern char ndbuf[256];
+extern xSemaphoreHandle debugsem;
+
+
+#define WEBLOG(...) do { \
+	if (debugsem) { \
+		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
+		xSemaphoreGive(debugsem); \
+	}\
+} while (0)
+#else
+#define WEBLOG
+#endif //DOWEBLOG
+
+
+/*
+#define PRINTF(...) do { \
+		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
+		xSemaphoreGive(debugsem); \
+	} while (0)
+#define PPRINTF(...) do { \
+		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
+		xSemaphoreGive(debugsem); \
+	} while (0)
+ */
 
 #ifdef ELITE_DEBUG
 #undef PRINTF
+#ifdef DOWEBLOG
+#define PRINTF WEBLOG
+#else
 #define PRINTF printf
+#endif  //DOWEBLOG
+#endif //ELITE_DEBUG
 #if ELITE_DEBUG > 1
 #undef PPRINTF
+#ifdef DOWEBLOG
+#define PPRINTF WEBLOG
+#else
 #define PPRINTF printf
 #endif
 #endif
+
 
 /**
  * For use with IP4_ADDR only.

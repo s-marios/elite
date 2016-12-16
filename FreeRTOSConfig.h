@@ -1,4 +1,4 @@
-/* Blink FreeRTOSConfig overrides.
+/* elite FreeRTOSConfig overrides.
 
    This is intended as an example of overriding some of the default FreeRTOSConfig settings,
    which are otherwise found in FreeRTOS/Source/include/FreeRTOSConfig.h
@@ -9,6 +9,9 @@
 
 /* Blink doesn't really need a lot of stack space! */
 #define configMINIMAL_STACK_SIZE 128
+
+/* sleep endlessly waiting for mutexes */
+#define INCLUDE_vTaskSuspend 1
 
 /* Use the defaults for everything else */
 #include_next<FreeRTOSConfig.h>
