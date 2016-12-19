@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
+
 #include "lwip/sockets.h"
 /*
  * Debug printfs
@@ -14,36 +15,43 @@
 #define PPRINTF
 #define DOWEBLOG
 
+
+
 #ifdef DOWEBLOG
+
 #include "FreeRTOS.h"
 #include "semphr.h"
 
+
 extern uint8_t ndsize;
 extern char ndbuf[256];
+extern xSemaphoreHandle debugdowrite;
 extern xSemaphoreHandle debugsem;
 
 
+//#define WEBLOG(...) do { \
+//	if (debugsem) { \
+//		xSemaphoreTake(debugdowrite, portMAX_DELAY); \
+//		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
+//		xSemaphoreGive(debugsem); \
+//		xSemaphoreTake(debugwritedone, 3000 / portTICK_RATE_MS); \
+//		xSemaphoreGive(debugdowrite); \
+//	}\
+} while (0)
+
 #define WEBLOG(...) do { \
 	if (debugsem) { \
+		xSemaphoreTake(debugdowrite, portMAX_DELAY); \
 		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
 		xSemaphoreGive(debugsem); \
+		xSemaphoreGive(debugdowrite); \
 	}\
 } while (0)
+
 #else
 #define WEBLOG
 #endif //DOWEBLOG
 
-
-/*
-#define PRINTF(...) do { \
-		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
-		xSemaphoreGive(debugsem); \
-	} while (0)
-#define PPRINTF(...) do { \
-		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
-		xSemaphoreGive(debugsem); \
-	} while (0)
- */
 
 #ifdef ELITE_DEBUG
 #undef PRINTF
@@ -358,4 +366,5 @@ typedef struct {
 OBJ_PTR matchObjects(OBJMATCH_PTR matcher);
 
 void receiveLoop(ECHOCTRL_PTR ectrl);
+
 #endif

@@ -3,6 +3,7 @@
  * This sample code is in the public domain.
  */
 #include <stdlib.h>
+#include <stdio.h>
 #include <malloc.h>
 #include <string.h>
 #include "espressif/esp_common.h"
@@ -38,6 +39,7 @@ char scratch[128];
 
 //net logging declarations
 xSemaphoreHandle debugsem;
+xSemaphoreHandle debugdowrite;
 char ndbuf[256];
 uint8_t ndsize;
 
@@ -526,11 +528,14 @@ static char * test_LFINDREPLACE() {
 	PRINTF(" done.\n");
 	mu_assert("LREPLACE: prop list length changed", i == propsize);
 	freeProperty(replacement);
+	PRINTF("free 1");
 	freeProperty(toFind);
+	PRINTF("we done?");
 	return 0;
 }
 
 static char * test_flipPropertyBit() {
+	PRINTF("test property bit\n");
 	char * bitmap = malloc(17 * sizeof(uint8_t));
 	memset(bitmap, 0, 17 * sizeof(uint8_t));
 	flipPropertyBit(0x80, bitmap);
@@ -550,6 +555,7 @@ static char * test_flipPropertyBit() {
 }
 
 static char * test_createBasicObject() {
+	PRINTF("test create basic object");
 	OBJ_PTR obj = (OBJ_PTR) createBasicObject("\x01\x02\x03");
 	uint8_t codes[] = { 0x80, 0x81, 0x82, 0x88, 0x8A, 0x9D, 0x9E, 0x9F };
 	for (int i = 0; i < sizeof(codes); i++) {
@@ -597,6 +603,7 @@ static char * test_propertyMaps() {
 }
 
 static char * test_createNodeProfileObject() {
+	PRINTF("create node profile object");
 	OBJ_PTR profile = createNodeProfileObject();
 	int propNum = 0;
 	FOREACH(profile->pHead, Property_PTR)
@@ -643,6 +650,7 @@ static char * test_computeClassesAndInstances() {
 	//d3 check
 	property = getProperty(profile, 0xD3);
 	int res = readProperty(property, 3, scratch);
+	PPRINTF("we crash here?");
 	PPRINTF("ni: %d res: %d\n", scratch[2], res);
 	mu_assert("CI: read size of d3", res == 3);
 	mu_assert("CI: d3 wrong number of instances", scratch[2] == 3);
@@ -909,19 +917,20 @@ static char * allTests() {
 }
 
 void runTestsTask(void * params) {
-	void * malloced = malloc(1);
-	PPRINTF("is malloced? : %s ", malloced ? "true" : "false");
-	PPRINTF("Sizeof ECHOFRAME: %d\n", sizeof(ECHOFRAME));
 	PPRINTF("running tests... \n");
 	char * result = allTests();
 	if (result != 0) {
 		PPRINTF("%s\n", result);
 	} else {
 		PPRINTF("ALL TESTS PASSED.");
+		printf("ALL TESTS PASSED.");
 	}
+
+	//genuinely WTF:
+	//if this task returns the system crashes.
+	//so... sleep forever!
 	while (1) {
-		vTaskDelay(1000 / portTICK_RATE_MS);
-		PPRINTF(".");
+		vTaskDelay(portMAX_DELAY);
 	}
 }
 
@@ -1034,19 +1043,28 @@ void setupObjects(ECHOCTRL_PTR ectrl) {
 	computeNodeClassInstanceLists(ectrl->oHead);
 }
 
+void netDebugTask(void);
 void eliteTask(void) {
-	int randint = rand();
-
-	PPRINTF("LWIP_IGMP: %c\n", ('0' + LWIP_IGMP));
-	PPRINTF("LWIP_SOCKET: %c\n", ('0' + LWIP_SOCKET));
-	PPRINTF("LWIP_NETCONN: %c\n", ('0' + LWIP_NETCONN));
-	PPRINTF("elite task started.");
-	PPRINTF("sdk version:%s\n", sdk_system_get_sdk_version());
 
 	setupWirelessIF();
+	xTaskCreate(netDebugTask, (signed char * )"netDebugTask", 256, NULL, 4,
+			NULL);
+
+	printf("Sleeping for 5...\n");
+
+	vTaskDelay(5000 / portTICK_RATE_MS);
+
+
+
+	PPRINTF("sdk version:%s\n", sdk_system_get_sdk_version());
+
+	xTaskCreate(runTestsTask, (signed char * )"runTestsTask", 512, NULL, 1,
+			NULL);
+
 	int msock = createMulticastSocket();
 
 	//setup our control struct.
+	printf("Echonet startup.");
 	ECHOCTRL_PTR ectrl = createEchonetControl();
 	ectrl->msock = msock;
 
@@ -1079,18 +1097,14 @@ void netDebugTask(void) {
 		return;
 	}
 
-	//time to setup our semaphore
-	debugsem = xSemaphoreCreateMutex();
+	//time to setup our semaphores
+	vSemaphoreCreateBinary(debugdowrite);
+	vSemaphoreCreateBinary(debugsem);
 	if (debugsem == NULL) {
 		PPRINTF("debug mutex creation fail\n");
 	} else {
 		PPRINTF("debug mutex creation success\n");
 	}
-
-	//endless sleep
-	PPRINTF("netDebugTask: Acquiring semaphore..");
-	xSemaphoreTake(debugsem, portMAX_DELAY);
-	PPRINTF("Done!\n");
 
 	struct sockaddr_in clientaddr;
 	socklen_t size = sizeof(clientaddr);
@@ -1114,7 +1128,7 @@ void netDebugTask(void) {
 void testPeriodic(void) {
 	int i = 0;
 	while (1) {
-		vTaskDelay(3000 / portTICK_RATE_MS);
+		vTaskDelay(300 / portTICK_RATE_MS);
 		PPRINTF("looping... %d\n", ++i)
 		;
 
@@ -1123,18 +1137,13 @@ void testPeriodic(void) {
 
 void user_init(void) {
 	uart_set_baud(0, 115200);
-//gdbstub_init();
+	//gdbstub_init();
 
-	//set debug sem to null
 	debugsem = NULL;
+	debugdowrite = NULL;
 
-
-	xTaskCreate(runTestsTask, (signed char * )"runTestsTask", 256, NULL, 2,
-			NULL);
-
-	xTaskCreate(netDebugTask, (signed char * )"netDebugTask", 256, NULL, 2,
-			NULL);
 	xTaskCreate(eliteTask, (signed char * )"eliteTask", 256, NULL, 1, NULL);
 	xTaskCreate(testPeriodic, (signed char * ) "testPeriodic", 256, NULL, 1,
 			NULL);
+
 }
