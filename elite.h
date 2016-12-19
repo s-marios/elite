@@ -179,7 +179,10 @@ ECHOFRAME_PTR allocateFrame(size_t alocsize);
 ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, char * data, size_t length);
 ECHOFRAME_PTR initFrameDepr(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID);
 ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID);
-#define freeFrame(frame) free(frame)
+#define freeFrame(frame) do { \
+	if (frame) \
+	free(frame); \
+} while (0)
 /**
  * creates a simple response frame.
  *

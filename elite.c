@@ -359,7 +359,7 @@ int writeProperty(Property_PTR property, uint8_t size, char * buf) {
 	} else {
 		//TODO better: schedule the notification for later
 		int result = property->writef(property, size, buf);
-		if (property->rwn_mode & E_NOTIFY) {
+		if (result > 0 && property->rwn_mode & E_NOTIFY) {
 			makeNotification(property);
 		}
 		return result;
