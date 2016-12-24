@@ -1018,6 +1018,16 @@ void * defaultOut(HANDLER_PTR handler, void * outgoing) {
 	return NULL;
 }
 
+void sendNotification(ECHOCTRL_PTR context, ECHOFRAME_PTR outgoing) {
+	if (context && outgoing) {
+		finalizeFrame(outgoing);
+		sendto(context->msock, outgoing->data, outgoing->used, 0,
+				(const struct sockaddr * ) &context->maddr,
+				sizeof(struct sockaddr));
+	}
+}
+
+
 void makeNotification(Property_PTR property) {
 	ECHOCTRL_PTR ectrl = property->pObj->ectrl;
 	if (!ectrl || ectrl->msock < 0) {
@@ -1031,6 +1041,7 @@ void makeNotification(Property_PTR property) {
 
 	int readres = putProperty(nframe, property);
 	if (readres > 0) {
+		//sendNotification(ectrl, nframe);
 		finalizeFrame(nframe);
 
 		sendto(ectrl->msock, nframe->data, nframe->used, 0,

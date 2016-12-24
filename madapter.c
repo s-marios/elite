@@ -155,6 +155,7 @@ ECHOFRAME_PTR doSendReceive1(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 	return result;
 }
 
+//parse results
 #define PR_OK 0
 #define PR_EMPTY 1
 #define PR_NOSTX 2
@@ -167,11 +168,23 @@ ECHOFRAME_PTR doSendReceive1(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 #define PR_FDLONG 32
 #define PR_FCC 64
 
+//standard adapter header
 #define E_OFF_FT 1
 #define E_OFF_CN 3
 #define E_OFF_FN 4
 #define E_OFF_DL 5
 #define E_OFF_FDZERO 7
+
+//response offsets for... cn 90
+#define E_OFF_RES 10
+#define E_OFF_RESLEN 12
+#define E_OFF_RESEPC 14
+#define E_OFF_RESEDT 15
+
+//request offsets for.... cn11 (NREQ)
+#define E_OFF_NREQ_LEN 10
+#define E_OFF_NREQ_EPC 12
+#define E_OFF_NREQ_EDT 13
 
 int parseAdapterFrame(ECHOFRAME_PTR frame) {
 	//checks
@@ -282,7 +295,6 @@ void madapterReceiverTask(void * pvParameters) {
 			uart_clear_rxfifo(0);
 
 		}
-
 	}
 }
 
@@ -362,27 +374,36 @@ void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 
 	//PPRINTF("c");
 	//pray...
-//	PPRINTF("NO FWRITE: used: %d fdout: %d\n\n", response->used, adapter->out);
+	//	PPRINTF("NO FWRITE: used: %d fdout: %d\n\n", response->used, adapter->out);
 
-//	sendOverSerial(adapter, response);
 	fwrite(response->data, 1, response->used, adapter->out);
-	//TODO 2. perform actual notification
+
+	//////////////////////////////////
+	//perform actual notification   //
+	//////////////////////////////////
 	if (!adapter->context) {
 		PPRINTF("handleNR: assert fails, init your context\n");
 	}
-	//PPRINTF("TODO: perform the actual notifications from the adapter\n");
+	ECHOFRAME_PTR
+	nframe = initFrame(ECHOFRAME_MAXSIZE,
+			incTID(adapter->context));
+	putEOJ(nframe, &response->data[E_OFF_FDZERO]);
+	putEOJ(nframe, (unsigned char *) PROFILEEOJ);
+	putESVnOPC(nframe, ESV_INF);
+	//-1: exclude the epc
+	uint16_t datalen = getShort(request, E_OFF_NREQ_LEN) - 1;
+	putEPC(nframe, request->data[E_OFF_NREQ_EPC], (uint8_t) datalen,
+			&request->data[E_OFF_NREQ_EDT]);
 
-
+	PPRINTF("Send notification... ");
+	sendNotification(adapter->context, nframe);
 
 	PPRINTF("HNR DONE\n");
+	freeFrame(nframe);
 	freeFrame(response);
 	freeFrame(request);
 }
 
-#define E_OFF_RES 10
-#define E_OFF_RESLEN 12
-#define E_OFF_RESEPC 14
-#define E_OFF_RESEDT 15
 
 /**
  * todo SEMANTICS?! what is this buff?! for read response?

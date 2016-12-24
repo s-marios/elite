@@ -108,6 +108,7 @@ typedef struct {
 } ECHOCTRL, *ECHOCTRL_PTR;
 
 ECHOCTRL_PTR createEchonetControl();
+uint16_t incTID(ECHOCTRL_PTR cptr);
 
 /**
  * A structure representing an ECHONET Lite frame.
@@ -289,7 +290,7 @@ void addObject(ECHOCTRL_PTR ectrl, OBJ_PTR obj);
 
 void addProperty(OBJ_PTR obj, Property_PTR property);
 void makeNotification(Property_PTR property);
-
+void sendNotification(ECHOCTRL_PTR context, ECHOFRAME_PTR outgoing);
 
 int readProperty(Property_PTR property, uint8_t size, char * buf);
 int writeProperty(Property_PTR property, uint8_t size, char * buf);
