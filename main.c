@@ -1031,14 +1031,16 @@ int createMulticastSocket() {
 //			NULL);
 //}
 
-void setupObjects(ECHOCTRL_PTR ectrl) {
+void setupObjects(ECHOCTRL_PTR ectrl, MADAPTER_PTR adapter) {
 	OBJ_PTR profile = createNodeProfileObject();
 
-	OBJ_PTR testobj = createBasicObject("\x00\x01\x02");
+	OBJ_PTR testobj = createBasicObject("\x02\x65\x01");
 	addProperty(testobj,
 			createDataProperty(0xF0, E_READ | E_WRITE | E_NOTIFY, 8, 3, "ABC"));
 	addProperty(testobj,
 			createDataProperty(0xF1, E_READ | E_NOTIFY, 4, 4, "TEST"));
+	addProperty(testobj,
+			createIAupProperty(0xEA, E_READ | E_NOTIFY, adapter));
 	computePropertyMaps(testobj);
 	computePropertyMaps(profile);
 	addObject(ectrl, profile);
@@ -1085,7 +1087,7 @@ void eliteTask(void) {
 	PPRINTF("receiver task");
 	startReceiverTask(adapter);
 
-	setupObjects(ectrl);
+	setupObjects(ectrl, adapter);
 	Property_PTR wakeupcall = getProperty(getObject(ectrl->oHead, PROFILEEOJ),
 			0xD5);
 	for (int i = 0; i < 3; i++) {

@@ -347,6 +347,9 @@ void addProperty(OBJ_PTR obj, Property_PTR property) {
 	property->pObj = obj;
 }
 
+/**
+ * return bytes read, zero or less in failure
+ */
 int readProperty(Property_PTR property, uint8_t size, char * buf) {
 	if (property == NULL || property->readf == NULL) {
 		return -1;
@@ -357,6 +360,9 @@ int readProperty(Property_PTR property, uint8_t size, char * buf) {
 	}
 }
 
+/**
+ * return bytes written, zero or less on failure
+ */
 int writeProperty(Property_PTR property, uint8_t size, char * buf) {
 	if (property == NULL || property->writef == NULL) {
 		return -1;
@@ -852,17 +858,30 @@ int processWrite(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj) {
 
 int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj,
 		E_WRITEMODE rwn) {
-	static char readbuffer[ECHOFRAME_MAXSIZE];
-	static uint8_t readres;
+	//static char readbuffer[ECHOFRAME_MAXSIZE];
+	char * readbuffer;
+	uint8_t readres;
 	PARSE_EPC parsedepc;
 	memset(&parsedepc, 0, sizeof(parsedepc));
 	while (getNextEPC(incoming, &parsedepc)) {
 		Property_PTR property = getProperty(obj, parsedepc.epc);
 		if (property && (property->rwn_mode & rwn)) {
-			readres = readProperty(property, ECHOFRAME_MAXSIZE, readbuffer);
+			//this is hacking...
+			//we avoid creating intermediate buffer here
+			//skip 2 places
+			readbuffer = &response->data[response->used + 2];
+			uint8_t buffersize = response->allocated - response->used;
+			readres = readProperty(property, buffersize, readbuffer);
 			if (readres > 0) {
 				//property exists and read succeeded
-				putEPC(response, property->propcode, readres, readbuffer);
+				//OLD: putEPC(response, property->propcode, readres, readbuffer);
+				//NEW: piecemeal putEPC.
+				putByte(response, property->propcode);
+				putByte(response, readres);
+				//resp bytes already in!
+				response->used += readres;
+				//probably useless here
+				response->propNum++;
 			} else {
 				putEPC(response, parsedepc.epc, 0, NULL);
 				//change ESV to failure
@@ -907,7 +926,7 @@ ECHOFRAME_PTR getPerObjectResponse(ECHOFRAME_PTR incoming, OBJ_PTR obj) {
 		PPRINTF("TODO: SetGet not supported yet");
 		break;
 	default:
-		PPRINTF("pIF: Unrecognized ESV, doing nothing\n");
+		PPRINTF("pIF: Unrecognized ESV (%d), doing nothing\n", esv);
 	}
 	return res;
 }
