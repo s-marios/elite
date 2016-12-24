@@ -180,6 +180,14 @@ ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char * eoj,
 int putByte(ECHOFRAME_PTR fptr, char byte);
 int putBytes(ECHOFRAME_PTR fptr, uint8_t num, char * data);
 int putShort(ECHOFRAME_PTR fptr, uint16_t aShort);
+/**
+ * puts the contents of a property into the buffer.
+ * If the internal readProperty fails, buffer remains unchanged.
+ *
+ * return number of bytes put into the buffer, -1 otherwise
+ */
+int putProperty(ECHOFRAME_PTR fptr, Property_PTR property);
+
 
 uint16_t getShort(ECHOFRAME_PTR fptr, uint16_t offset);
 int putEOJ(ECHOFRAME_PTR fptr, EOJ eoj);

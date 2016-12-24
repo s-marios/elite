@@ -222,9 +222,8 @@ void madapterReceiverTask(void * pvParameters) {
 
 	//we always receive, without fail
 #define MADAPTER_BUFSIZ 255
-	//static char cbuf[MADAPTER_BUFSIZ];
 	//printf("adapter null? %d\n", adapter);
-	PPRINTF("madapterReceiverTask started. adapter NULL?%s\n", adapter?"false":"true");
+	PPRINTF("madapterReceiverTask started. adapter NULL? %s\n", adapter?"false":"true");
 	printf("in mda\n");
 	int test = getc(stdin);
 	printf("char read: %c\n", test);
@@ -373,8 +372,9 @@ void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 	}
 	//PPRINTF("TODO: perform the actual notifications from the adapter\n");
 
-	PPRINTF("HNR DONE\n");
 
+
+	PPRINTF("HNR DONE\n");
 	freeFrame(response);
 	freeFrame(request);
 }

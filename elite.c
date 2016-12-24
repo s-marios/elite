@@ -103,6 +103,25 @@ int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, char * data) {
 	return 0;
 }
 
+/**
+ * TRY to copy the value of property into the frame. If we fail,
+ * the fptr remains unchained.
+ */
+int putProperty(ECHOFRAME_PTR fptr, Property_PTR property) {
+	char * to = &fptr->data[fptr->used + 2];
+	int result = readProperty(property, fptr->allocated - fptr->used, to);
+	if (result > 0) {
+		putByte(fptr, property->propcode);
+		putByte(fptr, result);
+		//increase according to the read result
+		fptr->used += result;
+		fptr->propNum++;
+		return result;
+	} else {
+		return -1;
+	}
+}
+
 int putESVnOPC(ECHOFRAME_PTR fptr, ESV esv) {
 	putByte(fptr, esv);
 	putByte(fptr, 0);
@@ -866,31 +885,16 @@ int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj,
 	while (getNextEPC(incoming, &parsedepc)) {
 		Property_PTR property = getProperty(obj, parsedepc.epc);
 		if (property && (property->rwn_mode & rwn)) {
-			//this is hacking...
-			//we avoid creating intermediate buffer here
-			//skip 2 places
-			readbuffer = &response->data[response->used + 2];
-			uint8_t buffersize = response->allocated - response->used;
-			readres = readProperty(property, buffersize, readbuffer);
-			if (readres > 0) {
-				//property exists and read succeeded
-				//OLD: putEPC(response, property->propcode, readres, readbuffer);
-				//NEW: piecemeal putEPC.
-				putByte(response, property->propcode);
-				putByte(response, readres);
-				//resp bytes already in!
-				response->used += readres;
-				//probably useless here
-				response->propNum++;
-			} else {
+
+			readres = putProperty(response, property);
+			if (readres < 0) {
 				putEPC(response, parsedepc.epc, 0, NULL);
 				//change ESV to failure
 				setESV(response, getESV(incoming) - 0x10);
 				return -1;
 			}
-		}
 
-		else {
+		} else {
 			//no such property
 			putEPC(response, parsedepc.epc, 0, NULL);
 			//change ESV to failure
@@ -1020,15 +1024,13 @@ void makeNotification(Property_PTR property) {
 		return;
 	}
 	//send a packet with the data from property
-	ECHOFRAME_PTR nframe = initFrame(128, incTID(ectrl));
+	ECHOFRAME_PTR nframe = initFrame(ECHOFRAME_MAXSIZE, incTID(ectrl));
 	putEOJ(nframe, property->pObj->eoj);
-	putEOJ(nframe, PROFILEEOJ);
+	putEOJ(nframe, (unsigned char *) PROFILEEOJ);
 	putESVnOPC(nframe, ESV_INF);
 
-	char * buf = malloc(128);
-	int charread = readProperty(property, 128, buf);
-	if (charread > 0) {
-		putEPC(nframe, property->propcode, charread, buf);
+	int readres = putProperty(nframe, property);
+	if (readres > 0) {
 		finalizeFrame(nframe);
 
 		sendto(ectrl->msock, nframe->data, nframe->used, 0,
@@ -1036,7 +1038,6 @@ void makeNotification(Property_PTR property) {
 				sizeof(struct sockaddr));
 	}
 	freeFrame(nframe);
-	free(buf);
 }
 
 void receiveLoop(ECHOCTRL_PTR ectrl) {

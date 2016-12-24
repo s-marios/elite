@@ -1034,17 +1034,19 @@ int createMulticastSocket() {
 void setupObjects(ECHOCTRL_PTR ectrl, MADAPTER_PTR adapter) {
 	OBJ_PTR profile = createNodeProfileObject();
 
-	OBJ_PTR testobj = createBasicObject("\x02\x65\x01");
-	addProperty(testobj,
+	OBJ_PTR windowobj = createBasicObject("\x02\x65\x01");
+	addProperty(windowobj,
 			createDataProperty(0xF0, E_READ | E_WRITE | E_NOTIFY, 8, 3, "ABC"));
-	addProperty(testobj,
+	addProperty(windowobj,
 			createDataProperty(0xF1, E_READ | E_NOTIFY, 4, 4, "TEST"));
-	addProperty(testobj,
+	addProperty(windowobj,
+			createIAupProperty(0xE0, E_READ | E_WRITE | E_NOTIFY, adapter));
+	addProperty(windowobj,
 			createIAupProperty(0xEA, E_READ | E_NOTIFY, adapter));
-	computePropertyMaps(testobj);
+	computePropertyMaps(windowobj);
 	computePropertyMaps(profile);
 	addObject(ectrl, profile);
-	addObject(ectrl, testobj);
+	addObject(ectrl, windowobj);
 	computeNodeClassInstanceLists(ectrl->oHead);
 }
 
