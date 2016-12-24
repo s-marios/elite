@@ -942,6 +942,7 @@ void setupWirelessIF() {
 	sdk_wifi_set_opmode(STATION_MODE);
 	sdk_wifi_station_set_config(&config);
 
+	printf("before connect");
 	PPRINTF("connecting to wifi");
 	while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) {
 		vTaskDelay(1000 / portTICK_RATE_MS);
@@ -950,7 +951,7 @@ void setupWirelessIF() {
 	PPRINTF("connected.");
 
 	/****** netif IGMP INIT *************/
-
+	printf("before igmp");
 	//struct netif* netif = eagle_lwip_getif(STATION_IF);
 	struct netif* netif = netif_default;
 	PPRINTF("default netif is NULL? :%s\n", netif == NULL ? "yes" : "no");
@@ -958,7 +959,9 @@ void setupWirelessIF() {
 
 		if (!(netif->flags & NETIF_FLAG_IGMP)) {
 			netif->flags |= NETIF_FLAG_IGMP;
+			printf("start igmp\n");
 			igmp_start(netif);
+			printf("end igmp\n");
 		}
 	}
 
@@ -1044,22 +1047,26 @@ void setupObjects(ECHOCTRL_PTR ectrl) {
 }
 
 void netDebugTask(void);
+void setupUART(void);
 void eliteTask(void) {
 
+	//printf("gief char\n");
+	//int rbyte = getc(stdin);
+	//printf("char given: %c\n", rbyte);
+
+	printf("wireless start\n");
 	setupWirelessIF();
+	printf("wireless end\n");
 	xTaskCreate(netDebugTask, (signed char * )"netDebugTask", 256, NULL, 4,
 			NULL);
 
 	printf("Sleeping for 5...\n");
 
 	vTaskDelay(5000 / portTICK_RATE_MS);
-
-
-
 	PPRINTF("sdk version:%s\n", sdk_system_get_sdk_version());
 
-	xTaskCreate(runTestsTask, (signed char * )"runTestsTask", 512, NULL, 1,
-			NULL);
+//	xTaskCreate(runTestsTask, (signed char * )"runTestsTask", 512, NULL, 1,
+//			NULL);
 
 	int msock = createMulticastSocket();
 
@@ -1068,6 +1075,16 @@ void eliteTask(void) {
 	ECHOCTRL_PTR ectrl = createEchonetControl();
 	ectrl->msock = msock;
 
+	//setup middlewareAdapter
+	PPRINTF("madapter init");
+	setupUART();
+	MADAPTER_PTR adapter = createMiddlewareAdapter(stdin, stdout);
+	setContext(adapter, ectrl);
+	PPRINTF("madapter set context");
+
+	PPRINTF("receiver task");
+	startReceiverTask(adapter);
+
 	setupObjects(ectrl);
 	Property_PTR wakeupcall = getProperty(getObject(ectrl->oHead, PROFILEEOJ),
 			0xD5);
@@ -1075,13 +1092,6 @@ void eliteTask(void) {
 		makeNotification(wakeupcall);
 	}
 	receiveLoop(ectrl);
-//	const char data[] = "TEST";
-//	while (1) {
-//		vTaskDelay(3000 / portTICK_RATE_MS);
-//		PPRINTF("*");
-//		sendto(ectrl->msock, data, sizeof(data), 0,
-//				(struct sockaddr * ) &ectrl->maddr, sizeof(struct sockaddr_in));
-//	}
 }
 
 void netDebugTask(void) {
@@ -1135,14 +1145,39 @@ void testPeriodic(void) {
 	}
 }
 
+void setupUART() {
+	uint32_t conf = UART(0).CONF0;
+	UART(0).CONF0 = conf | UART_CONF0_PARITY_ENABLE
+			| (UART_CONF0_BYTE_LEN_M << UART_CONF0_BYTE_LEN_S)
+			| UART_CONF0_STOP_BITS_S;
+	uart_clear_rxfifo(0);
+}
+
+static char freadbuf[512];
 void user_init(void) {
-	uart_set_baud(0, 115200);
+	uart_set_baud(0, 9600);
 	//gdbstub_init();
 
 	debugsem = NULL;
 	debugdowrite = NULL;
 
-	xTaskCreate(eliteTask, (signed char * )"eliteTask", 256, NULL, 1, NULL);
+	printf("portTICK_RATE_MS: %d\n", portTICK_RATE_MS);
+//	printf("gief input\n");
+//	static char test[16];
+//	int res = setvbuf(stdin, freadbuf, _IONBF, 512);
+//	for (int i = 0; i < 15; i++) {
+//	char get = getc(stdin);
+//	printf("char get: %c\n", get);
+//	}
+//	fwrite("test\n", 1, 5, stdout);
+	//printf("fread test\n");
+	//this crashes
+	//fread(test, 1, 15, stdin);
+	//fread_unlocked(test, 1, 15, stdin);
+	//printf("test input: %s\n", test);
+
+
+	xTaskCreate(eliteTask, (signed char * )"eliteTask", 1024, NULL, 1, NULL);
 	xTaskCreate(testPeriodic, (signed char * ) "testPeriodic", 256, NULL, 1,
 			NULL);
 

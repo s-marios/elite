@@ -28,17 +28,6 @@ extern char ndbuf[256];
 extern xSemaphoreHandle debugdowrite;
 extern xSemaphoreHandle debugsem;
 
-
-//#define WEBLOG(...) do { \
-//	if (debugsem) { \
-//		xSemaphoreTake(debugdowrite, portMAX_DELAY); \
-//		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
-//		xSemaphoreGive(debugsem); \
-//		xSemaphoreTake(debugwritedone, 3000 / portTICK_RATE_MS); \
-//		xSemaphoreGive(debugdowrite); \
-//	}\
-} while (0)
-
 #define WEBLOG(...) do { \
 	if (debugsem) { \
 		xSemaphoreTake(debugdowrite, portMAX_DELAY); \
@@ -179,10 +168,7 @@ ECHOFRAME_PTR allocateFrame(size_t alocsize);
 ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, char * data, size_t length);
 ECHOFRAME_PTR initFrameDepr(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID);
 ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID);
-#define freeFrame(frame) do { \
-	if (frame) \
-	free(frame); \
-} while (0)
+void freeFrame(ECHOFRAME_PTR frame);
 /**
  * creates a simple response frame.
  *

@@ -2,6 +2,9 @@
 #include <string.h>
 #include <malloc.h>
 
+#include "espressif/esp_common.h"
+#include "esp/uart.h"
+
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
@@ -49,11 +52,13 @@ ECHOFRAME_PTR setupIASetGetupFrame(uint8_t fn, Property_PTR property,
 		len += datalen;
 		putShort(fptr, len);
 		putByte(fptr, property->propcode);
-		putBytes(fptr, len, data);
+		putBytes(fptr, datalen, data);
 	}
+	//TODO endianess with this...
 	//do the DL field now, using updated len.
 	fptr->data[E_INDEX_DL] = len >> 8;
 	fptr->data[E_INDEX_DL + 1] = len && 0x00ff;
+	//FCC handled in doSendReceive1
 	return fptr;
 }
 
@@ -61,7 +66,7 @@ uint8_t computeFCC(ECHOFRAME_PTR fptr) {
 	//for frames created by us.
 	//we will be writing the final fcc byte
 	uint8_t sum = 0;
-	for (int i = 1; fptr->used; i++) {
+	for (int i = 1; i < fptr->used; i++) {
 		sum += fptr->data[i];
 	}
 	putByte(fptr, -sum);
@@ -90,13 +95,21 @@ MADAPTER_PTR createMiddlewareAdapter(FILE * in, FILE * out) {
 	vSemaphoreCreateBinary(madapter->syncresponse);
 	//have the semaphore be down, it will be signaled from the receiving task.
 	xSemaphoreTake(madapter->syncresponse, 1000 / portTICK_RATE_MS);
-	//set buffering for stin/stdout:
+	//set buffering for io:
 	int res = setvbuf(madapter->in, NULL, _IONBF, BUFSIZ);
-	PPRINTF("setvbuf (madapter in) res: %d\n", res);
+	//PPRINTF("setvbuf (madapter in) res: %d\n", res);
 	res = setvbuf(madapter->out, NULL, _IONBF, BUFSIZ);
-	PPRINTF("setvbuf (madapter out) res: %d\n", res);
-
+	//PPRINTF("setvbuf (madapter out) res: %d\n", res);
+	PPRINTF("adapter created\n");
 	return madapter;
+}
+
+void sendOverSerial(MADAPTER_PTR adapter, ECHOFRAME_PTR outgoing) {
+
+	for (int i = 0; i < outgoing->used; i++) {
+		//stdout for the time being
+		putc(outgoing->data[i], stdout);
+	}
 }
 
 /**
@@ -168,11 +181,13 @@ int parseAdapterFrame(ECHOFRAME_PTR frame) {
 	uint16_t dl = getShort(frame, E_OFF_DL);
 	if (dl > 256) {
 		//currently we don't do packets that big.
+		PPRINTF("mad parse: badDL %d\n", dl);
 		return PR_BADDL;
 	}
 	uint16_t framesize = E_OFF_FDZERO + dl + 1; //header + data + fcc
-	if (framesize > frame->used) {
+	if (frame->used < framesize) {
 		//incoming frame must be longer but it's short. data still missing
+		//PPRINTF("mad parse: incomplete frame, length: %d\n", frame->used);
 		return PR_FDINCMPLT;
 	}
 	if (framesize < frame->used) {
@@ -183,6 +198,7 @@ int parseAdapterFrame(ECHOFRAME_PTR frame) {
 	//framesize == frame->used
 	if (verifyFCC(frame)) {
 		//FCC IS BAD
+		PPRINTF("mad parse: BAD FCC\n");
 		return PR_FCC;
 	}
 	//looks pretty fine to me!
@@ -191,44 +207,86 @@ int parseAdapterFrame(ECHOFRAME_PTR frame) {
 
 void processFrame(MADAPTER_PTR adapter, ECHOFRAME_PTR frame);
 
-void madapterReceiverTask(MADAPTER_PTR adapter) {
+void madapterReceiverTask(void * pvParameters) {
+	MADAPTER_PTR adapter = (MADAPTER_PTR) pvParameters;
+	portTickType prev;
+	portTickType now;
+	prev = xTaskGetTickCount() / portTICK_RATE_MS;
+
 	//we always receive, without fail
 #define MADAPTER_BUFSIZ 255
+	//static char cbuf[MADAPTER_BUFSIZ];
+	//printf("adapter null? %d\n", adapter);
+	PPRINTF("madapterReceiverTask started. adapter NULL?%s\n", adapter?"false":"true");
+	printf("in mda\n");
+	int test = getc(stdin);
+	printf("char read: %c\n", test);
 	ECHOFRAME_PTR incoming = NULL;
 	for (;;) {
 		if (incoming == NULL) {
 			//max expected incoming size set for the window.
 			incoming = allocateFrame(MADAPTER_BUFSIZ);
 		}
-		int read = fread(&ECHOFRAME_HEAD(incoming),
-		MADAPTER_BUFSIZ - incoming->used, 1, adapter->in);
-		if (read < 0) {
+		//PPRINTF("mad read\n");
+		//everything commented out crashes the mcu
+		//int readbytes = fread(
+		//		cbuf, 1,
+		//		&incoming->data[incoming->used], sizeof(char),
+		//		MADAPTER_BUFSIZ - incoming->used, adapter->in);
+		//int rbyte = getc(adapter->in);
+		//int rbyte = getc(stdin);
+		//int rbyte = fgetc_unlocked(stdin);
+		int rbyte = getc(stdin);
+		/* if we have mroe than 300 ms since last reception, reset everything*/
+		now = xTaskGetTickCount() * portTICK_RATE_MS;
+		if (now - prev > 100) {
+			incoming->used = 0;
+			PPRINTF("RESET BUFFER\n\n");
+		}
+		//PPRINTF("tick: %d %d \n", prev, now);
+		prev = now;
+
+		//process incoming byte
+		if (rbyte < 0) {
+			PPRINTF(" d ");
 			//read failed. discard everything and try again.. better luck next time
 			incoming->used = 0;
-			continue;
+			uart_clear_rxfifo(0);
+
+			//this is monumentally stupid, we have zero bytes coming in all the time!
+			//} else if (rbyte == 0) {
+			//	PPRINTF("z ");
+			//	continue;
 		} else {
+			//PPRINTF("r");
 			//we read something.
-			incoming->used += read;
+			//incoming->used += readbytes;
+			putByte(incoming, rbyte);
 			int parseres = parseAdapterFrame(incoming);
-			PPRINTF("madapter parse result: %d\n", parseres);
 			if (parseres == PR_OK) {
+				PPRINTF("madpr: parse ok!\n");
 				//PROCESS THE DAMN THING!
 				processFrame(adapter, incoming);
+				//frame freed by the processors.. hopefully..
 				//trigger frame creation in the next loop..
 				incoming = NULL;
+				continue;
 			} else if (parseres & (PR_HEADER | PR_FDINCMPLT)) {
 				//short header or incomplete fd data.. wait
 				continue;
-			} else {
-				//burn everything
-				incoming->used = 0;
 			}
+			PPRINTF("madpr: %d bytes: %d\n", parseres, incoming->used);
+			//burn everything
+			incoming->used = 0;
+			uart_clear_rxfifo(0);
+
 		}
 
 	}
 }
 
-void processNormalCommunicationFrame(MADAPTER_PTR adapter, ECHOFRAME_PTR frame);
+void processNormalCommunicationFrame(MADAPTER_PTR adapter,
+		ECHOFRAME_PTR incoming);
 
 void processFrame(MADAPTER_PTR adapter, ECHOFRAME_PTR frame) {
 	//we have a valid frame, try and do things with it.
@@ -239,34 +297,35 @@ void processFrame(MADAPTER_PTR adapter, ECHOFRAME_PTR frame) {
 	case 0x0003:
 		processNormalCommunicationFrame(adapter, frame);
 		break;
-
 	default:
 		PPRINTF("madapter: can't handle frame with type: %d\n", ft);
 		break;
 	}
 }
 
-void matchIAResponse(MADAPTER_PTR adapter, ECHOFRAME_PTR frame);
-void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR frame);
-void processNormalCommunicationFrame(MADAPTER_PTR adapter, ECHOFRAME_PTR frame) {
-	uint8_t cn = frame->data[E_OFF_CN];
+void matchIAResponse(MADAPTER_PTR adapter, ECHOFRAME_PTR incoming);
+void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR request);
+void processNormalCommunicationFrame(MADAPTER_PTR adapter,
+		ECHOFRAME_PTR incoming) {
+	uint8_t cn = incoming->data[E_OFF_CN];
 	switch (cn) {
 	case E_CN_UPRESP:
-		matchIAResponse(adapter, frame);
+		matchIAResponse(adapter, incoming);
 		break;
 	case E_CN_NREQ:
-		handleNotifyRequest(adapter, frame);
+		handleNotifyRequest(adapter, incoming);
 		break;
 	default:
 		PPRINTF("processNCF: CN %d\n", cn);
 		//frame handled. free it.
-		freeFrame(frame);
-
+		freeFrame(incoming);
 	}
 }
 
 void matchIAResponse(MADAPTER_PTR adapter, ECHOFRAME_PTR frame) {
 	//TODO: be more thorough with the matching. currently only fn
+	PPRINTF("IN MATCH IA RESPONSE\n");
+
 	if (adapter->request
 			&& adapter->request->data[E_OFF_FN] == frame->data[E_OFF_FN]) {
 		//we have a match.
@@ -277,25 +336,46 @@ void matchIAResponse(MADAPTER_PTR adapter, ECHOFRAME_PTR frame) {
 	//in all other cases...
 	//no match/fail/whatever. Free the packet.
 	freeFrame(frame);
+
 }
 
-void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR frame) {
-	//TODO 1. send response back.
-	//WE NEVER FAIL. NEVER.
-	uint8_t fn = frame->data[E_OFF_FN];
-	ECHOFRAME_PTR response = initAdapterFrame(13, E_FT_0003, E_CN_NRESP, fn);
-	putShort(response, 0x0005);
-	putEOJ(response, &frame->data[E_OFF_FDZERO]);
-	computeFCC(response);
-	//pray...
-	fwrite(response->data, response->used, 1, adapter->out);
+void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 
+	//TODO 1. send response back.
+	//PPRINTF("IN HNR\n\n");
+	//WE NEVER FAIL. NEVER.
+	uint8_t fn = request->data[E_OFF_FN];
+	//PPRINTF("fn :%d\n", fn);
+	ECHOFRAME_PTR response = initAdapterFrame(13, E_FT_0003, E_CN_NRESP, fn);
+
+	//DL fixed to 5
+	//PPRINTF("r");
+	putShort(response, 0x0005);
+	//FD0 Result: WE NEVER FAIL
+	//PPRINTF("s");
+	putShort(response, 0x0000);
+	//FD1 copy eoj from request
+	//PPRINTF("a");
+	putEOJ(response, (unsigned char *) &request->data[E_OFF_FDZERO]);
+	//PPRINTF("b");
+	computeFCC(response);
+
+	//PPRINTF("c");
+	//pray...
+//	PPRINTF("NO FWRITE: used: %d fdout: %d\n\n", response->used, adapter->out);
+
+//	sendOverSerial(adapter, response);
+	fwrite(response->data, 1, response->used, adapter->out);
 	//TODO 2. perform actual notification
 	if (!adapter->context) {
 		PPRINTF("handleNR: assert fails, init your context\n");
 	}
-	PPRINTF("TODO: perform the actual notifications from the adapter\n");
+	//PPRINTF("TODO: perform the actual notifications from the adapter\n");
 
+	PPRINTF("HNR DONE\n");
+
+	freeFrame(response);
+	freeFrame(request);
 }
 
 #define E_OFF_RES 10
@@ -370,6 +450,6 @@ Property_PTR createIAupProperty(uint8_t propcode, uint8_t rwn,
 }
 
 void startReceiverTask(MADAPTER_PTR adapter) {
-	xTaskCreate(madapterReceiverTask, "madapter receiver task", 256, NULL, 3,
-			NULL);
+	xTaskCreate(madapterReceiverTask, (signed char * )"madapterReceiverTask",
+			2048, adapter, 1, NULL);
 }

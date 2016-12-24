@@ -19,7 +19,7 @@ typedef struct {
 } MADAPTER, *MADAPTER_PTR;
 
 MADAPTER_PTR createMiddlewareAdapter(FILE * in, FILE * out);
-#define setContext( x, context) x->context = context
+#define setContext( x, cont) x->context = cont
 #define getFN(x, fn) do { \
 	fn = x->FN; \
 	x->FN++; \
@@ -29,6 +29,7 @@ MADAPTER_PTR createMiddlewareAdapter(FILE * in, FILE * out);
 Property_PTR createIAupProperty(uint8_t propcode, uint8_t rwn,
 		MADAPTER_PTR adapter);
 
+void startReceiverTask(MADAPTER_PTR adapter);
+
+
 #endif
-
-

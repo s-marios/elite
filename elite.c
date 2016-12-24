@@ -12,7 +12,7 @@ ECHOFRAME_PTR allocateFrame(size_t alocsize) {
 		alocsize = ECHOFRAME_STDSIZE;
 	}
 	ECHOFRAME_PTR fptr = (ECHOFRAME_PTR) malloc(
-			alocsize + sizeof(ECHOFRAME_STDSIZE));
+			alocsize + sizeof(ECHOFRAME));
 	if (fptr) {
 		fptr->allocated = alocsize;
 		fptr->used = 0;
@@ -59,7 +59,7 @@ ECHOCTRL_PTR createEchonetControl() {
 }
 
 int checkSize(ECHOFRAME_PTR fptr, size_t increase) {
-	return fptr->used + increase >= fptr->allocated;
+	return fptr->used + increase > fptr->allocated;
 }
 
 int putBytes(ECHOFRAME_PTR fptr, uint8_t num, char * data) {
@@ -131,6 +131,12 @@ ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID) {
 	putByte(fptr, E_HD2);
 	putShort(fptr, TID);
 	return fptr;
+}
+
+void freeFrame(ECHOFRAME_PTR frame) {
+	if (frame) {
+		free(frame);
+	}
 }
 
 ESV getAffirmativeESV(ESV esv) {
@@ -548,7 +554,7 @@ Property_PTR getProperty(OBJ_PTR obj, uint8_t code) {
 	return (Property_PTR) LFIND(obj->pHead, code, comparePropertyCode);
 }
 
-copyBitmapsToProperties(OBJ_PTR obj, const char * rawmaps) {
+void copyBitmapsToProperties(OBJ_PTR obj, const char * rawmaps) {
 	uint8_t codes[] = { 0x9D, 0x9E, 0x9F };
 	Property_PTR prop;
 	for (int i = 0; i < sizeof(codes); i++) {
@@ -1016,7 +1022,7 @@ void makeNotification(Property_PTR property) {
 
 void receiveLoop(ECHOCTRL_PTR ectrl) {
 	for (;;) {
-		PPRINTF("R");
+		PPRINTF(" R ");
 		socklen_t addrlen = sizeof(struct sockaddr_in);
 		int res = recvfrom(ectrl->msock, ectrl->buffer, ECHOCTRL_BUFSIZE, 0,
 				&ectrl->incoming, &addrlen);
