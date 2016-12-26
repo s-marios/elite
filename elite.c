@@ -11,8 +11,7 @@ ECHOFRAME_PTR allocateFrame(size_t alocsize) {
 	if (alocsize <= 0 || alocsize > ECHOFRAME_MAXSIZE) {
 		alocsize = ECHOFRAME_STDSIZE;
 	}
-	ECHOFRAME_PTR fptr = (ECHOFRAME_PTR) malloc(
-			alocsize + sizeof(ECHOFRAME));
+	ECHOFRAME_PTR fptr = (ECHOFRAME_PTR) malloc(alocsize + sizeof(ECHOFRAME));
 	if (fptr) {
 		fptr->allocated = alocsize;
 		fptr->used = 0;
@@ -390,7 +389,8 @@ int writeProperty(Property_PTR property, uint8_t size, char * buf) {
 	} else {
 		//TODO better: schedule the notification for later
 		int result = property->writef(property, size, buf);
-		if (result > 0 && property->rwn_mode & E_NOTIFY) {
+		if (result > 0 && property->rwn_mode & E_NOTIFY
+				&& !(property->rwn_mode & E_SUPPRESS_NOTIFY)) {
 			makeNotification(property);
 		}
 		return result;
@@ -1026,7 +1026,6 @@ void sendNotification(ECHOCTRL_PTR context, ECHOFRAME_PTR outgoing) {
 				sizeof(struct sockaddr));
 	}
 }
-
 
 void makeNotification(Property_PTR property) {
 	ECHOCTRL_PTR ectrl = property->pObj->ectrl;

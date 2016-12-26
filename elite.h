@@ -249,7 +249,7 @@ typedef Property_PTR (*FREEFUNC)(Property_PTR property);
 #define FREE(aptr) aptr->freeptr(aptr)
 
 typedef enum {
-	E_READ = 1, E_WRITE = 2, E_NOTIFY = 4,
+	E_READ = 1, E_WRITE = 2, E_NOTIFY = 4, E_SUPPRESS_NOTIFY = 8,
 } E_WRITEMODE;
 
 struct Property {

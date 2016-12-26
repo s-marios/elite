@@ -481,7 +481,8 @@ int doIASetup(Property_PTR property, uint8_t size, char * buf) {
 
 Property_PTR createIAupProperty(uint8_t propcode, uint8_t rwn,
 		MADAPTER_PTR adapter) {
-	Property_PTR property = createProperty(propcode, rwn);
+	//suppress notification generation for adapter properties
+	Property_PTR property = createProperty(propcode, rwn | E_SUPPRESS_NOTIFY);
 	if (property == NULL) {
 		return NULL;
 	}
