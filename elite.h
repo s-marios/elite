@@ -145,7 +145,6 @@ typedef enum {
 	ESV_INF_SNA = 0x53,
 	ESV_SETGET_SNA = 0x5E
 } ESV;
-#define ESV_REQUIRESANSWER (ESV_SETC | ESV_GET | ESV_INFREQ | ESV_SETGET)
 
 #define E_HD1 0x10
 #define E_HD2 0x81

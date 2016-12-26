@@ -158,13 +158,11 @@ void freeFrame(ECHOFRAME_PTR frame) {
 }
 
 ESV getAffirmativeESV(ESV esv) {
-	if (esv & ESV_REQUIRESANSWER) {
-		return esv + 0x10;
-	}
 	if (esv == ESV_INFC) {
 		return ESV_INFCRES;
+	} else {
+		return esv + 0x10;
 	}
-	return 0;
 }
 
 ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char * eoj,
@@ -861,13 +859,17 @@ int processWrite(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj) {
 		if (property
 				&& writeProperty(property, parsedepc.pdc, parsedepc.edt) > 0) {
 			//property exists and write succeeded
-			putEPC(response, property->propcode, 0, NULL);
+			if (response) { //SETI generates no response
+				putEPC(response, property->propcode, 0, NULL);
+			}
 		} else {
 			//no such property OR write fail. same handling
 			//write fail - put the original contents in.
-			putEPC(response, parsedepc.epc, parsedepc.pdc, parsedepc.edt);
-			//change ESV to failure
-			setESV(response, getESV(incoming) - 0x10);
+			if (response) {			//SETI generates no response
+				putEPC(response, parsedepc.epc, parsedepc.pdc, parsedepc.edt);
+				//change ESV to failure
+				setESV(response, getESV(incoming) - 0x10);
+			}
 			return -1;
 		}
 	}
@@ -877,8 +879,9 @@ int processWrite(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj) {
 
 int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj,
 		E_WRITEMODE rwn) {
-	//static char readbuffer[ECHOFRAME_MAXSIZE];
-	char * readbuffer;
+	if (response == NULL) {
+		return -2;
+	}
 	uint8_t readres;
 	PARSE_EPC parsedepc;
 	memset(&parsedepc, 0, sizeof(parsedepc));
@@ -912,18 +915,19 @@ ECHOFRAME_PTR getPerObjectResponse(ECHOFRAME_PTR incoming, OBJ_PTR obj) {
 	}
 	ECHOFRAME_PTR res = NULL;
 	uint8_t esv = getESV(incoming);
-	if (esv & ESV_REQUIRESANSWER) {
-		res = initFrameResponse(incoming, obj->eoj, ECHOFRAME_MAXSIZE);
-	}
 	switch (esv) {
 	case ESV_SETC: //intentional fall through.
+		res = initFrameResponse(incoming, obj->eoj, ECHOFRAME_MAXSIZE);
+		//intentional!
 	case ESV_SETI:
 		processWrite(incoming, res, obj);
 		break;
 	case ESV_GET:
+		res = initFrameResponse(incoming, obj->eoj, ECHOFRAME_MAXSIZE);
 		processRead(incoming, res, obj, E_READ);
 		break;
 	case ESV_INFREQ:
+		res = initFrameResponse(incoming, obj->eoj, ECHOFRAME_MAXSIZE);
 		processRead(incoming, res, obj, E_NOTIFY | E_READ);
 		break;
 	case ESV_SETGET:
@@ -990,8 +994,6 @@ void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead,
 				matcher->lastmatch);
 		if (response) {
 			finalizeFrame(response);
-
-			//TODO do something with the response.
 			//SEND THEM over the wire
 			PPRINTF("pIF: created a response: \n");
 			if (handler) {
