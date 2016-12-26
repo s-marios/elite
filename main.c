@@ -923,7 +923,6 @@ void runTestsTask(void * params) {
 		PPRINTF("%s\n", result);
 	} else {
 		PPRINTF("ALL TESTS PASSED.");
-		printf("ALL TESTS PASSED.");
 	}
 
 	//genuinely WTF:
@@ -1054,17 +1053,14 @@ void netDebugTask(void);
 void setupUART(void);
 void eliteTask(void) {
 
-	//printf("gief char\n");
-	//int rbyte = getc(stdin);
-	//printf("char given: %c\n", rbyte);
-
 	printf("wireless start\n");
 	setupWirelessIF();
 	printf("wireless end\n");
+	printf("Sleeping for 5...\n");
+
 	xTaskCreate(netDebugTask, (signed char * )"netDebugTask", 256, NULL, 4,
 			NULL);
 
-	printf("Sleeping for 5...\n");
 
 	vTaskDelay(5000 / portTICK_RATE_MS);
 	PPRINTF("sdk version:%s\n", sdk_system_get_sdk_version());
@@ -1075,7 +1071,7 @@ void eliteTask(void) {
 	int msock = createMulticastSocket();
 
 	//setup our control struct.
-	printf("Echonet startup.");
+	PPRINTF("Echonet startup.");
 	ECHOCTRL_PTR ectrl = createEchonetControl();
 	ectrl->msock = msock;
 
@@ -1165,7 +1161,7 @@ void user_init(void) {
 	debugsem = NULL;
 	debugdowrite = NULL;
 
-	printf("portTICK_RATE_MS: %d\n", portTICK_RATE_MS);
+//	printf("portTICK_RATE_MS: %d\n", portTICK_RATE_MS);
 //	printf("gief input\n");
 //	static char test[16];
 //	int res = setvbuf(stdin, freadbuf, _IONBF, 512);

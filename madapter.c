@@ -235,11 +235,7 @@ void madapterReceiverTask(void * pvParameters) {
 
 	//we always receive, without fail
 #define MADAPTER_BUFSIZ 255
-	//printf("adapter null? %d\n", adapter);
 	PPRINTF("madapterReceiverTask started. adapter NULL? %s\n", adapter?"false":"true");
-	printf("in mda\n");
-	int test = getc(stdin);
-	printf("char read: %c\n", test);
 	ECHOFRAME_PTR incoming = NULL;
 	for (;;) {
 		if (incoming == NULL) {
