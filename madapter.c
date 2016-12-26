@@ -383,7 +383,7 @@ void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 	ECHOFRAME_PTR
 	nframe = initFrame(ECHOFRAME_MAXSIZE,
 			incTID(adapter->context));
-	putEOJ(nframe, &response->data[E_OFF_FDZERO]);
+	putEOJ(nframe, &request->data[E_OFF_FDZERO]);
 	putEOJ(nframe, (unsigned char *) PROFILEEOJ);
 	putESVnOPC(nframe, ESV_INF);
 	//-1: exclude the epc
@@ -462,7 +462,7 @@ int doIASetup(Property_PTR property, uint8_t size, char * buf) {
 	ECHOFRAME_PTR request = setupIASetGetupFrame(fn, property, size, buf);
 	ECHOFRAME_PTR response = doSendReceive1(adapter, request);
 
-	int result = 0;
+	int result = -1;
 	if (response) {
 		uint16_t resresult = getShort(response, E_OFF_RES);
 		if (resresult == 0) {
