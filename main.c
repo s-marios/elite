@@ -1034,14 +1034,26 @@ void setupObjects(ECHOCTRL_PTR ectrl, MADAPTER_PTR adapter) {
 	OBJ_PTR profile = createNodeProfileObject();
 
 	OBJ_PTR windowobj = createBasicObject("\x02\x65\x01");
+//	addProperty(windowobj,
+//			createDataProperty(0xF0, E_READ | E_WRITE | E_NOTIFY, 8, 3, "ABC"));
+//	addProperty(windowobj,
+//			createDataProperty(0xF1, E_READ | E_NOTIFY, 4, 4, "TEST"));
 	addProperty(windowobj,
-			createDataProperty(0xF0, E_READ | E_WRITE | E_NOTIFY, 8, 3, "ABC"));
-	addProperty(windowobj,
-			createDataProperty(0xF1, E_READ | E_NOTIFY, 4, 4, "TEST"));
+			createIAupProperty(0x89, E_READ | E_NOTIFY, adapter));
+	addProperty(windowobj, createIAupProperty(0xD2, E_READ | E_WRITE, adapter));
 	addProperty(windowobj,
 			createIAupProperty(0xE0, E_READ | E_WRITE | E_NOTIFY, adapter));
+	addProperty(windowobj, createIAupProperty(0xE1, E_READ | E_WRITE, adapter));
+	addProperty(windowobj, createIAupProperty(0xE3, E_READ | E_WRITE, adapter));
+	addProperty(windowobj,
+			createIAupProperty(0xE9, E_READ | E_WRITE | E_NOTIFY, adapter));
 	addProperty(windowobj,
 			createIAupProperty(0xEA, E_READ | E_NOTIFY, adapter));
+	addProperty(windowobj, createIAupProperty(0xEE, E_READ | E_WRITE, adapter));
+	addProperty(windowobj, createIAupProperty(0xEF, E_READ | E_WRITE, adapter));
+	addProperty(windowobj, createIAupProperty(0xFE, E_READ, adapter));
+	addProperty(windowobj, createIAupProperty(0xFA, E_READ | E_WRITE, adapter));
+
 	computePropertyMaps(windowobj);
 	computePropertyMaps(profile);
 	addObject(ectrl, profile);

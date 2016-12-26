@@ -593,6 +593,12 @@ void copyBitmapsToProperties(OBJ_PTR obj, const char * rawmaps) {
 	}
 }
 
+#define MAPOFF_N 0
+#define MAPOFF_S 17
+#define MAPOFF_G 34
+
+int computeMaps(OBJ_PTR obj, char * maps);
+
 int computePropertyMaps(OBJ_PTR obj) {
 	//in order: notify, set, get rawmaps
 	char * rawmaps = malloc(3 * 17);
@@ -603,18 +609,38 @@ int computePropertyMaps(OBJ_PTR obj) {
 	}
 	//first, count the properties to decide the format
 	int count = 0;
-	FOREACHPURE(obj->pHead)
+	int counts[3] = { 0, 0, 0 };
+	int modes[3] = { E_NOTIFY, E_WRITE, E_READ };
+	FOREACH(obj->pHead, Property_PTR)
 	{
+		if (element->rwn_mode & E_NOTIFY) {
+			counts[0]++;
+			rawmaps[MAPOFF_N]++;
+		}
+		if (element->rwn_mode & E_WRITE) {
+			counts[1]++;
+			rawmaps[MAPOFF_S]++;
+		}
+		if (element->rwn_mode & E_READ) {
+			counts[2]++;
+			rawmaps[MAPOFF_G]++;
+		}
 		count++;
 	}
 
-	if (count < 16) {
-		//TODO simpe bytes
-		computeListMaps(obj, rawmaps);
-	} else {
-		//TODO bitflips
-		computeBinaryMaps(obj, rawmaps);
-	}
+	PPRINTF("counts: %d %d %d\n", counts[0], counts[1], counts[2]);
+	computeMaps(obj, rawmaps);
+	//for (int i = 0; i < 3; i++) {
+//		if (count < 16) {
+//		//TODO simple bytes
+//			computeListMaps(obj, rawmaps);
+//		} else {
+//			//TODO bitflips
+//			computeBinaryMaps(obj, rawmaps);
+//		}
+	//}
+
+	//PPRINTF("counts: %d %d %d\n", counts[0], counts[1], counts[2]);
 	//rawmaps populated. copy this to the appropriate properties.
 	copyBitmapsToProperties(obj, rawmaps);
 
@@ -622,9 +648,39 @@ int computePropertyMaps(OBJ_PTR obj) {
 	return 0;
 }
 
-#define MAPOFF_N 0
-#define MAPOFF_S 17
-#define MAPOFF_G 34
+int computeMaps(OBJ_PTR obj, char * maps) {
+	int counts[3] = { 0, 0, 0 };
+	FOREACH(obj->pHead, Property_PTR)
+	{
+		if (element->rwn_mode & E_NOTIFY) {
+			if (maps[MAPOFF_N] < 16) {
+				counts[0]++;
+				maps[MAPOFF_N + counts[0]] = element->propcode;
+			} else {
+				flipPropertyBit(element->propcode, &maps[MAPOFF_N]);
+			}
+		}
+		if (element->rwn_mode & E_WRITE) {
+			if (maps[MAPOFF_S] < 16) {
+				counts[1]++;
+				maps[MAPOFF_S + counts[1]] = element->propcode;
+			} else {
+				flipPropertyBit(element->propcode, &maps[MAPOFF_S]);
+			}
+		}
+		if (element->rwn_mode & E_READ) {
+			if (maps[MAPOFF_G] < 16) {
+				counts[2]++;
+				maps[MAPOFF_G + counts[2]] = element->propcode;
+			} else {
+				flipPropertyBit(element->propcode, &maps[MAPOFF_G]);
+			}
+		}
+	}
+	return 0;
+}
+
+
 int computeListMaps(OBJ_PTR obj, char * maps) {
 	FOREACH(obj->pHead, Property_PTR)
 	{
