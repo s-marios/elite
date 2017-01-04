@@ -16,11 +16,10 @@
 #define DOWEBLOG
 
 
-
-#ifdef DOWEBLOG
-
 #include "FreeRTOS.h"
 #include "semphr.h"
+
+#ifdef DOWEBLOG
 
 
 extern uint8_t ndsize;

@@ -607,41 +607,8 @@ int computePropertyMaps(OBJ_PTR obj) {
 		PRINTF("run out of memory.");
 		return -1;
 	}
-	//first, count the properties to decide the format
-	int count = 0;
-	int counts[3] = { 0, 0, 0 };
-	int modes[3] = { E_NOTIFY, E_WRITE, E_READ };
-	FOREACH(obj->pHead, Property_PTR)
-	{
-		if (element->rwn_mode & E_NOTIFY) {
-			counts[0]++;
-			rawmaps[MAPOFF_N]++;
-		}
-		if (element->rwn_mode & E_WRITE) {
-			counts[1]++;
-			rawmaps[MAPOFF_S]++;
-		}
-		if (element->rwn_mode & E_READ) {
-			counts[2]++;
-			rawmaps[MAPOFF_G]++;
-		}
-		count++;
-	}
 
-	PPRINTF("counts: %d %d %d\n", counts[0], counts[1], counts[2]);
 	computeMaps(obj, rawmaps);
-	//for (int i = 0; i < 3; i++) {
-//		if (count < 16) {
-//		//TODO simple bytes
-//			computeListMaps(obj, rawmaps);
-//		} else {
-//			//TODO bitflips
-//			computeBinaryMaps(obj, rawmaps);
-//		}
-	//}
-
-	//PPRINTF("counts: %d %d %d\n", counts[0], counts[1], counts[2]);
-	//rawmaps populated. copy this to the appropriate properties.
 	copyBitmapsToProperties(obj, rawmaps);
 
 	free(rawmaps);
@@ -649,6 +616,22 @@ int computePropertyMaps(OBJ_PTR obj) {
 }
 
 int computeMaps(OBJ_PTR obj, char * maps) {
+	//first, count the properties to decide the format
+	int count = 0;
+	FOREACH(obj->pHead, Property_PTR)
+	{
+		if (element->rwn_mode & E_NOTIFY) {
+			maps[MAPOFF_N]++;
+		}
+		if (element->rwn_mode & E_WRITE) {
+			maps[MAPOFF_S]++;
+		}
+		if (element->rwn_mode & E_READ) {
+			maps[MAPOFF_G]++;
+		}
+		count++;
+	}
+
 	int counts[3] = { 0, 0, 0 };
 	FOREACH(obj->pHead, Property_PTR)
 	{
