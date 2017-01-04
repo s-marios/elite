@@ -10,8 +10,8 @@ ECHOFRAME_PTR initAdapterFrame(size_t alocsize, uint16_t ft, uint8_t cn,
 typedef struct {
 	FILE * out;
 	FILE * in;
-	xSemaphoreHandle writelock;
-	xSemaphoreHandle syncresponse;
+	SemaphoreHandle_t writelock;
+	SemaphoreHandle_t syncresponse;
 	ECHOFRAME_PTR request;
 	ECHOFRAME_PTR response;
 	ECHOCTRL_PTR context;

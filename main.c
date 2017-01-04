@@ -25,8 +25,6 @@
 #include "ipv4/lwip/ip.h"
 #include "lwip/sockets.h"
 
-#include "ssid_config.h"
-
 #include "minunit.h"
 #include "macrolist.h"
 #include "elite.h"
@@ -38,8 +36,8 @@ int tests_run = 0;
 char scratch[128];
 
 //net logging declarations
-xSemaphoreHandle debugsem;
-xSemaphoreHandle debugdowrite;
+SemaphoreHandle_t debugsem;
+SemaphoreHandle_t debugdowrite;
 char ndbuf[256];
 uint8_t ndsize;
 
@@ -944,7 +942,7 @@ void setupWirelessIF() {
 	printf("before connect");
 	PPRINTF("connecting to wifi");
 	while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) {
-		vTaskDelay(1000 / portTICK_RATE_MS);
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
 		PPRINTF(".");
 	}
 	PPRINTF("connected.");
@@ -1074,7 +1072,7 @@ void eliteTask(void) {
 			NULL);
 
 
-	vTaskDelay(5000 / portTICK_RATE_MS);
+	vTaskDelay(5000 / portTICK_PERIOD_MS);
 	PPRINTF("sdk version:%s\n", sdk_system_get_sdk_version());
 
 //	xTaskCreate(runTestsTask, (signed char * )"runTestsTask", 512, NULL, 1,
@@ -1150,7 +1148,7 @@ void netDebugTask(void) {
 void testPeriodic(void) {
 	int i = 0;
 	while (1) {
-		vTaskDelay(300 / portTICK_RATE_MS);
+		vTaskDelay(300 / portTICK_PERIOD_MS);
 		PPRINTF("looping... %d\n", ++i)
 		;
 
@@ -1173,7 +1171,7 @@ void user_init(void) {
 	debugsem = NULL;
 	debugdowrite = NULL;
 
-//	printf("portTICK_RATE_MS: %d\n", portTICK_RATE_MS);
+//	printf("portTICK_PERIOD_MS: %d\n", portTICK_PERIOD_MS);
 //	printf("gief input\n");
 //	static char test[16];
 //	int res = setvbuf(stdin, freadbuf, _IONBF, 512);

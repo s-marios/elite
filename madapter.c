@@ -95,7 +95,7 @@ MADAPTER_PTR createMiddlewareAdapter(FILE * in, FILE * out) {
 	vSemaphoreCreateBinary(madapter->writelock);
 	vSemaphoreCreateBinary(madapter->syncresponse);
 	//have the semaphore be down, it will be signaled from the receiving task.
-	xSemaphoreTake(madapter->syncresponse, 1000 / portTICK_RATE_MS);
+	xSemaphoreTake(madapter->syncresponse, 1000 / portTICK_PERIOD_MS);
 	//set buffering for io:
 	int res = setvbuf(madapter->in, NULL, _IONBF, BUFSIZ);
 	//PPRINTF("setvbuf (madapter in) res: %d\n", res);
@@ -122,7 +122,7 @@ ECHOFRAME_PTR doSendReceive1(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 
 	ECHOFRAME_PTR result = NULL;
 	//can we write?
-	int waitres = xSemaphoreTake(adapter->writelock, 3000 / portTICK_RATE_MS);
+	int waitres = xSemaphoreTake(adapter->writelock, 3000 / portTICK_PERIOD_MS);
 	if (waitres == pdTRUE) {
 		PPRINTF("dSR1: send\n");
 		//we got the semaphore, do work.
@@ -134,7 +134,7 @@ ECHOFRAME_PTR doSendReceive1(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 		fwrite(request->data, 1, request->used, adapter->out);
 		//await response for 3 secs
 		if (xSemaphoreTake(adapter->syncresponse,
-				1000 / portTICK_RATE_MS) == pdTRUE) {
+				1000 / portTICK_PERIOD_MS) == pdTRUE) {
 
 			result = adapter->response;
 			PPRINTF("dSR1: GOT RESPONSE!\n");
@@ -229,9 +229,9 @@ void processFrame(MADAPTER_PTR adapter, ECHOFRAME_PTR frame);
 
 void madapterReceiverTask(void * pvParameters) {
 	MADAPTER_PTR adapter = (MADAPTER_PTR) pvParameters;
-	portTickType prev;
-	portTickType now;
-	prev = xTaskGetTickCount() / portTICK_RATE_MS;
+	TickType_t prev;
+	TickType_t now;
+	prev = xTaskGetTickCount() / portTICK_PERIOD_MS;
 
 	//we always receive, without fail
 #define MADAPTER_BUFSIZ 255
@@ -253,7 +253,7 @@ void madapterReceiverTask(void * pvParameters) {
 		//int rbyte = fgetc_unlocked(stdin);
 		int rbyte = getc(stdin);
 		/* if we have mroe than 300 ms since last reception, reset everything*/
-		now = xTaskGetTickCount() * portTICK_RATE_MS;
+		now = xTaskGetTickCount() * portTICK_PERIOD_MS;
 		if (now - prev > 100) {
 			incoming->used = 0;
 			PPRINTF("RESET BUFFER\n\n");

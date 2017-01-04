@@ -24,8 +24,9 @@
 
 extern uint8_t ndsize;
 extern char ndbuf[256];
-extern xSemaphoreHandle debugdowrite;
-extern xSemaphoreHandle debugsem;
+extern SemaphoreHandle_t debugdowrite;
+extern SemaphoreHandle_t debugsem;
+
 
 #define WEBLOG(...) do { \
 	if (debugsem) { \

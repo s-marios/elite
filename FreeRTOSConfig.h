@@ -7,8 +7,11 @@
 /* We sleep a lot, so cooperative multitasking is fine. */
 #define configUSE_PREEMPTION 0
 
-/* Blink doesn't really need a lot of stack space! */
+/* Elite doesn't really need a lot of stack space! */
 #define configMINIMAL_STACK_SIZE 128
+
+/* Support for dynamic allocation, enables vSemaphoreCreateBinary */
+#define configSUPPORT_DYNAMIC_ALLOCATION 1
 
 /* sleep endlessly waiting for mutexes */
 #define INCLUDE_vTaskSuspend 1
