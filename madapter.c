@@ -39,8 +39,7 @@ ECHOFRAME_PTR setupIASetGetupFrame(uint8_t fn, Property_PTR property,
 	//size: standard header + (6 + datalen) bytes request + 1 FCC
 	ECHOFRAME_PTR fptr = initAdapterFrame(7 + 6 + datalen + 1,
 	E_FT_0003,
-	E_CN_UP,
-			fn);
+	E_CN_UP, fn);
 	if (fptr == NULL) {
 		return NULL;
 	}
@@ -340,11 +339,13 @@ void matchIAResponse(MADAPTER_PTR adapter, ECHOFRAME_PTR incoming) {
 		//we have a match in terms of frame number.
 		adapter->response = incoming;
 		xSemaphoreGive(adapter->syncresponse);
+		return;
 		//and we're done! client frees the memory.
+	} else {
+		//in all other cases...
+		//no match/fail/whatever. Free the packet.
+		freeFrame(incoming);
 	}
-	//in all other cases...
-	//no match/fail/whatever. Free the packet.
-	freeFrame(incoming);
 }
 
 void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
@@ -380,8 +381,7 @@ void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 	if (!adapter->context) {
 		PPRINTF("handleNR: assert fails, init your context\n");
 	}
-	ECHOFRAME_PTR
-	nframe = initFrame(ECHOFRAME_MAXSIZE,
+	ECHOFRAME_PTR nframe = initFrame(ECHOFRAME_MAXSIZE,
 			incTID(adapter->context));
 	putEOJ(nframe, &request->data[E_OFF_FDZERO]);
 	putEOJ(nframe, (unsigned char *) PROFILEEOJ);
@@ -399,7 +399,6 @@ void handleNotifyRequest(MADAPTER_PTR adapter, ECHOFRAME_PTR request) {
 	freeFrame(response);
 	freeFrame(request);
 }
-
 
 /**
  * todo SEMANTICS?! what is this buff?! for read response?
@@ -493,6 +492,6 @@ Property_PTR createIAupProperty(uint8_t propcode, uint8_t rwn,
 }
 
 void startReceiverTask(MADAPTER_PTR adapter) {
-	xTaskCreate(madapterReceiverTask, (signed char * )"madapterReceiverTask",
+	xTaskCreate(madapterReceiverTask, (signed char *) "madapterReceiverTask",
 			2048, adapter, 1, NULL);
 }
