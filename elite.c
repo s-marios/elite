@@ -1,3 +1,8 @@
+/**
+ * \file
+ *
+ * This is the bulk of the ECHONET Lite implementation.
+ */
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
@@ -102,10 +107,6 @@ int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, char * data) {
 	return 0;
 }
 
-/**
- * TRY to copy the value of property into the frame. If we fail,
- * the fptr remains unchained.
- */
 int putProperty(ECHOFRAME_PTR fptr, Property_PTR property) {
 	char * to = &fptr->data[fptr->used + 2];
 	int result = readProperty(property, fptr->allocated - fptr->used, to);
@@ -157,6 +158,9 @@ void freeFrame(ECHOFRAME_PTR frame) {
 	}
 }
 
+/**
+ * Currently all affirmative ESV are +10 except ESV_INFC
+ */
 ESV getAffirmativeESV(ESV esv) {
 	if (esv == ESV_INFC) {
 		return ESV_INFCRES;
@@ -175,7 +179,7 @@ ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char * eoj,
 	if (eoj) {
 		putEOJ(fptr, eoj);
 	} else {
-		putEOJ(fptr, getSEOJ(incoming));
+		putEOJ(fptr, getDEOJ(incoming));
 	}
 	//deoj is source eoj of incoming
 	putEOJ(fptr, getSEOJ(incoming));

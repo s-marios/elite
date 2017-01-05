@@ -1,3 +1,8 @@
+/**
+ * \file
+ *
+ * internally used header file, not intended to be used by an application directly
+ */
 #ifndef ELITE_PRIV_H
 #define ELITE_PRIV_H
 

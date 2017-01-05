@@ -1,6 +1,13 @@
-/* The classic "blink" example
+/**
+ * \file
  *
- * This sample code is in the public domain.
+ * This is the main application, and currently the only example of how to
+ * use the echonet lite library. Go through this code for initialization
+ * examples.
+ *
+ * The functions named test_??????? test various parts of the system and
+ * were used during development. Currently tests are disabled and a few
+ * tests may not pass in their current form.
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -36,9 +43,14 @@ int tests_run = 0;
 char scratch[128];
 
 //net logging declarations
+
+/** for net debug */
 SemaphoreHandle_t debugsem;
+/** for net debug */
 SemaphoreHandle_t debugdowrite;
+/** for net debug */
 char ndbuf[256];
+/** for net debug */
 uint8_t ndsize;
 
 
@@ -731,6 +743,10 @@ static char * test_computeClassesAndInstances() {
 	return 0;
 }
 
+/**
+ * This was an outgoing processor used instead of sending a packet out
+ * on the network. Helped for basic testing.
+ */
 void * outgoingTestProcessor(HANDLER_PTR handler, void * out) {
 	static uint8_t processorIndex = 0;
 	ECHOFRAME_PTR outgoing = (ECHOFRAME_PTR) out;
@@ -914,6 +930,10 @@ static char * allTests() {
 	return 0;
 }
 
+/**
+ * the main test task. if you want to enable tests again, create a task
+ * that has this function as its entry point.
+ */
 void runTestsTask(void * params) {
 	PPRINTF("running tests... \n");
 	char * result = allTests();
@@ -931,11 +951,23 @@ void runTestsTask(void * params) {
 	}
 }
 
+/**
+ * the Wifi SSID to connect to. Change this to your needs.
+ */
 #define WIFI_SSID "testnet"
-
+/**
+ * the password used to connet to the wifi. Change this to your needs.
+ */
+#define WIFI_PASSWORD "password"
+/**
+ * This function is used to setup the wireless connection. Currently it is
+ * using DHCP. Furthermore, it initializes IGMP, with ESP8266 specific calls
+ * and registers.
+ */
 void setupWirelessIF() {
+
 	struct sdk_station_config config = { .ssid = WIFI_SSID, .password =
-			"password", };
+	WIFI_PASSWORD, };
 	sdk_wifi_set_opmode(STATION_MODE);
 	sdk_wifi_station_set_config(&config);
 
@@ -964,6 +996,11 @@ void setupWirelessIF() {
 
 }
 
+/**
+ * This creates the debug socket. Unfortunately, this is quite unreliable
+ * and not a substitute for proper debugging facilities. Use this in desperate
+ * times only, disable it through #DOWEBLOG if not needed.
+ */
 int createDebugSocket() {
 	int dsock = socket(AF_INET, SOCK_STREAM, 0);
 	if (dsock < 0) {
@@ -983,6 +1020,9 @@ int createDebugSocket() {
 	return dsock;
 }
 
+/**
+ * Creates the multicast socket that will be used for echonet lite purposes
+ */
 int createMulticastSocket() {
 	//create socket
 	int msock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -1023,15 +1063,29 @@ int createMulticastSocket() {
 	return msock;
 }
 
+// i don't remember what this is...
 //void startReceivingLoop(ECHOCTRL_PTR ectrl) {
 //	xTaskCreate(receiveLoop, (signed char * ) "eliteReceiveLoop", 256, ectrl, 1,
 //			NULL);
 //}
 
+/**
+ * This is an example of how to set up objects and properties. Make sure to
+ * imitate this for your object initialization needs. General steps:
+ * 1: create a node profile object
+ * 2: create a basic object
+ * 3: add properties to the object of stage 2
+ * 4: compute property maps for both objects
+ * 5: register the objects with the control context.
+ * 6: calculate the node clas instance lists at the very end.
+ *
+ * @param ectrl the echonet lite control context
+ * @param adapter the middleware adapter control struct
+ */
 void setupObjects(ECHOCTRL_PTR ectrl, MADAPTER_PTR adapter) {
 	OBJ_PTR profile = createNodeProfileObject();
-
 	OBJ_PTR windowobj = createBasicObject("\x02\x65\x01");
+
 //	addProperty(windowobj,
 //			createDataProperty(0xF0, E_READ | E_WRITE | E_NOTIFY, 8, 3, "ABC"));
 //	addProperty(windowobj,
@@ -1060,7 +1114,31 @@ void setupObjects(ECHOCTRL_PTR ectrl, MADAPTER_PTR adapter) {
 }
 
 void netDebugTask(void);
+/**
+ * This function sets up UART0 appropriately, see the implementation for details
+ */
 void setupUART(void);
+
+/**
+ * entry point for the main task. Activities happening here:
+ * 1: setup the wireless network
+ * 2: create the debug task (comment this out here if you need, but also
+ * dont forget #DOWEBLOG
+ * 3: (optional) run tests
+ * 4: initialize the multicast socket.
+ * 5: setup the middleware adapter (tricky, initialize all members appropriately)
+ * 6: start adapter receiver task
+ * 7: setup all objects.
+ * 8: perform startup notifications
+ * 9: enter main receiver loop.
+ *
+ * Each step must happen for things to work correctly. However, the order of
+ * some of the steps can be slightly changed. Pay attention to any field
+ * initialization that didn't get handled internaly neatly in some function,
+ * because you will have to reproduce it in your code.
+ *
+ * \todo refactor this?
+ */
 void eliteTask(void) {
 
 	printf("wireless start\n");
@@ -1104,6 +1182,12 @@ void eliteTask(void) {
 	receiveLoop(ectrl);
 }
 
+/**
+ * the net debug task that performs the actual web logging. Uses semaphores
+ * to coordinate with other tasks that call #WEBLOG. two semaphores are
+ * necessary at least. Have a look at #WEBLOG to understand the interaction
+ * through semaphores.
+ */
 void netDebugTask(void) {
 
 	int sock = createDebugSocket();
@@ -1145,6 +1229,10 @@ void netDebugTask(void) {
 
 }
 
+/*
+ * a periodic task. Strictly speaking unnecessary but provides a sense of time
+ * disable this for release
+ */
 void testPeriodic(void) {
 	int i = 0;
 	while (1) {
@@ -1156,14 +1244,20 @@ void testPeriodic(void) {
 }
 
 void setupUART() {
+	//the conf0 register
 	uint32_t conf = UART(0).CONF0;
-	UART(0).CONF0 = conf | UART_CONF0_PARITY_ENABLE
-			| (UART_CONF0_BYTE_LEN_M << UART_CONF0_BYTE_LEN_S)
-			| UART_CONF0_STOP_BITS_S;
-	uart_clear_rxfifo(0);
+	//"or" the desired bits
+	UART(0).CONF0 = conf | UART_CONF0_PARITY_ENABLE //enable parity
+			| (UART_CONF0_BYTE_LEN_M << UART_CONF0_BYTE_LEN_S) //eight bits
+			| UART_CONF0_STOP_BITS_S; //parity even
+	uart_clear_rxfifo(0); //clear the receiving fifo while we:'re at it
 }
 
-static char freadbuf[512];
+//static char freadbuf[512];
+/**
+ * entry point for our code. Setup baudrate
+ * init the semaphore pointers and startup tasks.
+ */
 void user_init(void) {
 	uart_set_baud(0, 9600);
 	//gdbstub_init();
@@ -1186,8 +1280,9 @@ void user_init(void) {
 	//fread_unlocked(test, 1, 15, stdin);
 	//printf("test input: %s\n", test);
 
-
+//main task
 	xTaskCreate(eliteTask, (signed char * )"eliteTask", 1024, NULL, 1, NULL);
+//periodic looping task, comment this out if you don't need it.
 	xTaskCreate(testPeriodic, (signed char * ) "testPeriodic", 256, NULL, 1,
 			NULL);
 
