@@ -53,10 +53,6 @@ char ndbuf[256];
 /** for net debug */
 uint8_t ndsize;
 
-
-
-
-
 static char * test_PRINTF() {
 //#ifdef ELITE_DEBUG
 //	mu_assert("PRINTF: did not print", PRINTF("hello!") == 6);
@@ -1086,25 +1082,12 @@ void setupObjects(ECHOCTRL_PTR ectrl, MADAPTER_PTR adapter) {
 	OBJ_PTR profile = createNodeProfileObject();
 	OBJ_PTR windowobj = createBasicObject("\x02\x65\x01");
 
-//	addProperty(windowobj,
-//			createDataProperty(0xF0, E_READ | E_WRITE | E_NOTIFY, 8, 3, "ABC"));
-//	addProperty(windowobj,
-//			createDataProperty(0xF1, E_READ | E_NOTIFY, 4, 4, "TEST"));
 	addProperty(windowobj,
-			createIAupProperty(0x89, E_READ | E_NOTIFY, adapter));
-	addProperty(windowobj, createIAupProperty(0xD2, E_READ | E_WRITE, adapter));
+			createDataProperty(0xE0, E_READ | E_WRITE | E_NOTIFY, 0x01, 0x01,
+					"A"));
 	addProperty(windowobj,
-			createIAupProperty(0xE0, E_READ | E_WRITE | E_NOTIFY, adapter));
-	addProperty(windowobj, createIAupProperty(0xE1, E_READ | E_WRITE, adapter));
-	addProperty(windowobj, createIAupProperty(0xE3, E_READ | E_WRITE, adapter));
-	addProperty(windowobj,
-			createIAupProperty(0xE9, E_READ | E_WRITE | E_NOTIFY, adapter));
-	addProperty(windowobj,
-			createIAupProperty(0xEA, E_READ | E_NOTIFY, adapter));
-	addProperty(windowobj, createIAupProperty(0xEE, E_READ | E_WRITE, adapter));
-	addProperty(windowobj, createIAupProperty(0xEF, E_READ | E_WRITE, adapter));
-	addProperty(windowobj, createIAupProperty(0xFE, E_READ, adapter));
-	addProperty(windowobj, createIAupProperty(0xFA, E_READ | E_WRITE, adapter));
+			createDataProperty(0xEA, E_READ | E_WRITE | E_NOTIFY, 0x01, 0x01,
+					"A"));
 
 	computePropertyMaps(windowobj);
 	computePropertyMaps(profile);
@@ -1146,9 +1129,8 @@ void eliteTask(void) {
 	printf("wireless end\n");
 	printf("Sleeping for 5...\n");
 
-	xTaskCreate(netDebugTask, (signed char * )"netDebugTask", 256, NULL, 4,
-			NULL);
-
+	xTaskCreate(netDebugTask, (signed char *) "netDebugTask", 256, NULL, 4,
+	NULL);
 
 	vTaskDelay(5000 / portTICK_PERIOD_MS);
 	PPRINTF("sdk version:%s\n", sdk_system_get_sdk_version());
@@ -1237,8 +1219,7 @@ void testPeriodic(void) {
 	int i = 0;
 	while (1) {
 		vTaskDelay(300 / portTICK_PERIOD_MS);
-		PPRINTF("looping... %d\n", ++i)
-		;
+		PPRINTF("looping... %d\n", ++i);
 
 	}
 }
@@ -1281,9 +1262,9 @@ void user_init(void) {
 	//printf("test input: %s\n", test);
 
 //main task
-	xTaskCreate(eliteTask, (signed char * )"eliteTask", 1024, NULL, 1, NULL);
+	xTaskCreate(eliteTask, (signed char *) "eliteTask", 1024, NULL, 1, NULL);
 //periodic looping task, comment this out if you don't need it.
-	xTaskCreate(testPeriodic, (signed char * ) "testPeriodic", 256, NULL, 1,
-			NULL);
+	xTaskCreate(testPeriodic, (signed char *) "testPeriodic", 256, NULL, 1,
+	NULL);
 
 }
