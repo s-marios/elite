@@ -1080,19 +1080,21 @@ int createMulticastSocket() {
  */
 void setupObjects(ECHOCTRL_PTR ectrl, MADAPTER_PTR adapter) {
 	OBJ_PTR profile = createNodeProfileObject();
-	OBJ_PTR windowobj = createBasicObject("\x02\x65\x01");
+    //Emergency button object creation
+	OBJ_PTR eobject = createBasicObject("\x00\x03\x01");
 
-	addProperty(windowobj,
-			createDataProperty(0xE0, E_READ | E_WRITE | E_NOTIFY, 0x01, 0x01,
+    //the properties have no functionality implemented
+	addProperty(eobject,
+			createDataProperty(0xB1, E_READ | E_WRITE | E_NOTIFY, 0x01, 0x01,
 					"A"));
-	addProperty(windowobj,
-			createDataProperty(0xEA, E_READ | E_WRITE | E_NOTIFY, 0x01, 0x01,
+	addProperty(eobject,
+			createDataProperty(0xBF, E_READ | E_WRITE , 0x01, 0x01,
 					"A"));
 
-	computePropertyMaps(windowobj);
+	computePropertyMaps(eobject);
 	computePropertyMaps(profile);
 	addObject(ectrl, profile);
-	addObject(ectrl, windowobj);
+	addObject(ectrl, eobject);
 	computeNodeClassInstanceLists(ectrl->oHead);
 }
 
