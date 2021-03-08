@@ -49,7 +49,7 @@ void * LREPLACE(void ** head_ptr, void * oldelem, void * newelem) {
 	return NULL;
 }
 
-void * LGET(void * head, uint index) {
+void * LGET(void * head, uint16_t index) {
 	int i = 0;
 	FOREACHPURE(head)
 	{

@@ -4,11 +4,13 @@
  * This is the bulk of the ECHONET Lite implementation.
  */
 #include <stdio.h>
-#include <malloc.h>
+//sshhh... no malloc now, only stdlib...
+#include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 
 #include "elite.h"
+
 #include "elite_priv.h"
 #include "macrolist.h"
 
@@ -21,12 +23,13 @@ ECHOFRAME_PTR allocateFrame(size_t alocsize) {
 		fptr->allocated = alocsize;
 		fptr->used = 0;
 		fptr->propNum = 0;
-		fptr->data = ((char *) fptr) + sizeof(ECHOFRAME);
+		fptr->data = ((unsigned char*) fptr) + sizeof(ECHOFRAME);
 	}
 	return fptr;
 }
 
-ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, char * data, size_t length) {
+ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, unsigned char *data,
+		size_t length) {
 	if (frame == NULL) {
 		return NULL;
 	}
@@ -50,7 +53,7 @@ ECHOCTRL_PTR createEchonetControl() {
 	ECHOCTRL_PTR ecptr = malloc(sizeof(ECHOCTRL));
 	memset(ecptr, 0, sizeof(ECHOCTRL));
 	ecptr->TID = 1;
-	struct ip_addr dummy;
+	ip_addr_t dummy;
 	IP4_ADDR(&dummy, 224, 0, 23, 0);
 
 	ecptr->maddr.sin_addr.s_addr = dummy.addr;
@@ -66,7 +69,7 @@ int checkSize(ECHOFRAME_PTR fptr, size_t increase) {
 	return fptr->used + increase > fptr->allocated;
 }
 
-int putBytes(ECHOFRAME_PTR fptr, uint8_t num, char * data) {
+int putBytes(ECHOFRAME_PTR fptr, uint8_t num, unsigned char *data) {
 	if (checkSize(fptr, num)) {
 		return -1;
 	}
@@ -96,10 +99,10 @@ int putShort(ECHOFRAME_PTR fptr, uint16_t aShort) {
 }
 
 int putEOJ(ECHOFRAME_PTR fptr, EOJ eoj) {
-	return putBytes(fptr, 3, (char *) eoj);
+	return putBytes(fptr, 3, (unsigned char*) eoj);
 }
 
-int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, char * data) {
+int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, unsigned char *data) {
 	putByte(fptr, epc);
 	putByte(fptr, size);
 	putBytes(fptr, size, data);
@@ -108,7 +111,7 @@ int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, char * data) {
 }
 
 int putProperty(ECHOFRAME_PTR fptr, Property_PTR property) {
-	char * to = &fptr->data[fptr->used + 2];
+	unsigned char *to = &fptr->data[fptr->used + 2];
 	int result = readProperty(property, fptr->allocated - fptr->used, to);
 	if (result > 0) {
 		putByte(fptr, property->propcode);
@@ -169,7 +172,7 @@ ESV getAffirmativeESV(ESV esv) {
 	}
 }
 
-ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char * eoj,
+ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char *eoj,
 		size_t alocsize) {
 	if (incoming == NULL) {
 		return NULL;
@@ -268,7 +271,7 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 	PARSE_EPC epc;
 	memset(&epc, 0, sizeof(PARSE_EPC));
 	int skipResult = 1;
-	char * curProp = &fptr->data[index];
+	unsigned char *curProp = &fptr->data[index];
 	while (skipResult) {
 		//parse data into EPC struct
 		//which property is this? first second etc.
@@ -288,23 +291,23 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 		PPRINTF("EPC: 0x%2x %d\n", epc.epc, epc.pdc);
 		//all thing accounted for?
 		if (index < fptr->used) {
-			PPRINTF("readin next prop...\n");
+			PPRINTF("readin next prop...\r\n");
 			skipResult = 1;
 			curProp = &fptr->data[index];
 			continue;
 		} else if (index == fptr->used) {
 			//did we read all the properties?
-			PPRINTF("opc propIndex: %d %d\n", opc, epc.propIndex);
+			PPRINTF("opc propIndex: %d %d\r\n", opc, epc.propIndex);
 			if (epc.propIndex == opc) {
 				//everything matches
 				return PR_OK;
 			} else {
-				PPRINTF("too long but correct number of props...\n");
+				PPRINTF("too long but correct number of props...\r\n");
 				//we were about to read more properties.
 				return PR_TOOLONG;
 			}
 		} else if (index > fptr->used) {
-			PPRINTF("packet parsing too long...\n");
+			PPRINTF("packet parsing too long...\r\n");
 			return PR_TOOLONG;
 		}
 	}
@@ -333,7 +336,7 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc) {
 	}
 	//we have a next property, figure out the details here.
 	//this is the base address of the next property.
-	char * nextEPCptr = epc->edt + epc->pdc;
+	unsigned char *nextEPCptr = epc->edt + epc->pdc;
 	//parse the data
 	epc->epc = *nextEPCptr;
 	epc->pdc = *(nextEPCptr + 1);
@@ -347,7 +350,7 @@ void freeObject(OBJ_PTR obj) {
 	free(obj);
 }
 
-OBJ_PTR createObject(char * eoj) {
+OBJ_PTR createObject(char *eoj) {
 	OBJ_PTR obj = malloc(sizeof(OBJ));
 	if (obj == NULL) {
 		return 0;
@@ -358,19 +361,24 @@ OBJ_PTR createObject(char * eoj) {
 }
 
 void addObject(ECHOCTRL_PTR ectrl, OBJ_PTR obj) {
-	LAPPEND(&ectrl->oHead, obj);
+	LAPPEND((void**) &ectrl->oHead, obj);
 	obj->ectrl = ectrl;
 }
 
 void addProperty(OBJ_PTR obj, Property_PTR property) {
-	LAPPEND((void **) &obj->pHead, property);
+	Property_PTR exists = getProperty(obj, property->propcode);
+	if (exists) {
+		LREPLACE((void**) &obj->pHead, exists, property);
+	} else {
+		LAPPEND((void**) &obj->pHead, property);
+	}
 	property->pObj = obj;
 }
 
 /**
  * return bytes read, zero or less in failure
  */
-int readProperty(Property_PTR property, uint8_t size, char * buf) {
+int readProperty(Property_PTR property, uint8_t size, unsigned char *buf) {
 	if (property == NULL || property->readf == NULL) {
 		return -1;
 	} else if (buf == NULL) {
@@ -380,26 +388,51 @@ int readProperty(Property_PTR property, uint8_t size, char * buf) {
 	}
 }
 
+int requiresNotification(Property_PTR property, uint8_t size,
+		const unsigned char *buff);
+
 /**
  * return bytes written, zero or less on failure
  */
-int writeProperty(Property_PTR property, uint8_t size, char * buf) {
+int writeProperty(Property_PTR property, uint8_t size, const unsigned char *buf) {
 	if (property == NULL || property->writef == NULL) {
 		return -1;
 	} else if (buf == NULL) {
 		return -2;
 	} else {
-		//TODO better: schedule the notification for later
+		//Do we need notifications?
+		int doNotify = 0;
+		if (property->rwn_mode & E_NOTIFY) {
+			if (property->rwn_mode & E_SUPPRESS_NOTIFY) {
+				doNotify = requiresNotification(property, size, buf);
+			} else {
+				doNotify = 1;
+			}
+		}
+
+		//write
 		int result = property->writef(property, size, buf);
-		if (result > 0 && property->rwn_mode & E_NOTIFY
-				&& !(property->rwn_mode & E_SUPPRESS_NOTIFY)) {
+		//perform notification if necessary.
+		if (result > 0 && doNotify) {
 			makeNotification(property);
 		}
 		return result;
 	}
 }
 
-int testRead(Property_PTR property, uint8_t size, char * buf) {
+int requiresNotification(Property_PTR property, uint8_t size,
+		const unsigned char *incoming) {
+	unsigned char readbuffer[size];
+	//tricky: zero read bytes considered too
+	if (readProperty(property, size, readbuffer) <= 0) {
+		//error during read ... let's notify???
+		return 1;
+	}
+	//compare the two buffers and return the result..
+	return memcmp(readbuffer, incoming, size);
+}
+
+int testRead(Property_PTR property, uint8_t size, unsigned char *buf) {
 	memcpy(buf, "test", 4);
 	return 4;
 }
@@ -436,7 +469,7 @@ Property_PTR createProperty(uint8_t propcode, uint8_t mode) {
 	return property;
 }
 
-int compareProperties(void * prop, void * other) {
+int compareProperties(void *prop, void *other) {
 	if (prop == other) {
 		return 0;
 	}
@@ -450,7 +483,7 @@ int compareProperties(void * prop, void * other) {
 	return property->propcode - o->propcode;
 }
 
-int comparePropertyCode(void * prop, void * code) {
+int comparePropertyCode(void *prop, void *code) {
 	if (prop == NULL) {
 		return INT_MIN;
 	}
@@ -468,11 +501,11 @@ void initTestProperty(Property_PTR property) {
 typedef struct {
 	uint8_t maxsize;
 	uint8_t used;
-	char * data;
+	char *data;
 } DATABUFFER, *DATABUFFER_PTR;
 
 //read function for a "data property"
-int readData(Property_PTR property, uint8_t size, char * buf) {
+int readData(Property_PTR property, uint8_t size, unsigned char *buf) {
 	DATABUFFER_PTR databuffer = (DATABUFFER_PTR) property->opt;
 	if (databuffer->used > size) {
 		return 0;
@@ -483,7 +516,7 @@ int readData(Property_PTR property, uint8_t size, char * buf) {
 }
 
 //write function for a "data property"
-int writeData(Property_PTR property, uint8_t size, char * buf) {
+int writeData(Property_PTR property, uint8_t size, const unsigned char *buf) {
 	DATABUFFER_PTR databuffer = (DATABUFFER_PTR) property->opt;
 	if (size > databuffer->maxsize) {
 		return 0;
@@ -494,7 +527,8 @@ int writeData(Property_PTR property, uint8_t size, char * buf) {
 	}
 }
 
-int writeDataExact(Property_PTR property, uint8_t size, char * buf) {
+int writeDataExact(Property_PTR property, uint8_t size,
+		const unsigned char *buf) {
 	DATABUFFER_PTR databuffer = (DATABUFFER_PTR) property->opt;
 	if (size != databuffer->maxsize) {
 		return 0;
@@ -506,7 +540,7 @@ int writeDataExact(Property_PTR property, uint8_t size, char * buf) {
 }
 
 Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
-		uint8_t datasize, char * data) {
+		uint8_t datasize, char *data) {
 	Property_PTR property = createProperty(propcode, rwn);
 	if (property == NULL) {
 		return NULL;
@@ -542,16 +576,13 @@ Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 	//setup the read write accessors
 	//readwrite are hooked by default.
 	//access to them is available internally.
-	//if (rwn & E_WRITE) {
+
 	if (datasize < maxsize) {
 		property->writef = writeData;
 	} else if (datasize == maxsize) {
 		property->writef = writeDataExact;
 	}
-	//}
-	//if (rwn & E_READ) {
 	property->readf = readData;
-	//}
 	return property;
 }
 
@@ -563,7 +594,7 @@ Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
  * param code the property code
  * param pbitmap the property bitmap to be manipulated
  */
-void flipPropertyBit(uint8_t code, char * pbitmap) {
+void flipPropertyBit(uint8_t code, char *pbitmap) {
 	//high nibble specifies the bit to flip through shifting
 	//low nibble is the byte in which to flip
 	uint8_t highnibble, lownibble;
@@ -578,10 +609,10 @@ void flipPropertyBit(uint8_t code, char * pbitmap) {
 }
 
 Property_PTR getProperty(OBJ_PTR obj, uint8_t code) {
-	return (Property_PTR) LFIND(obj->pHead, code, comparePropertyCode);
+	return (Property_PTR) LFIND(obj->pHead, (void *) code, comparePropertyCode);
 }
 
-void copyBitmapsToProperties(OBJ_PTR obj, const char * rawmaps) {
+void copyBitmapsToProperties(OBJ_PTR obj, const unsigned char *rawmaps) {
 	uint8_t codes[] = { 0x9D, 0x9E, 0x9F };
 	Property_PTR prop;
 	for (int i = 0; i < sizeof(codes); i++) {
@@ -592,8 +623,7 @@ void copyBitmapsToProperties(OBJ_PTR obj, const char * rawmaps) {
 		if (size > 17) {
 			size = 17;
 		}
-		int res = writeProperty(prop, size, &rawmaps[i * 17]);
-		PPRINTF("copy bitmaps: %d\n", res);
+		writeProperty(prop, size, &rawmaps[i * 17]);
 	}
 }
 
@@ -601,11 +631,11 @@ void copyBitmapsToProperties(OBJ_PTR obj, const char * rawmaps) {
 #define MAPOFF_S 17
 #define MAPOFF_G 34
 
-int computeMaps(OBJ_PTR obj, char * maps);
+int computeMaps(OBJ_PTR obj, unsigned char *maps);
 
 int computePropertyMaps(OBJ_PTR obj) {
 	//in order: notify, set, get rawmaps
-	char * rawmaps = malloc(3 * 17);
+	unsigned char *rawmaps = malloc(3 * 17);
 	memset(rawmaps, 0, 3 * 17);
 	if (rawmaps == NULL) {
 		PRINTF("run out of memory.");
@@ -619,7 +649,7 @@ int computePropertyMaps(OBJ_PTR obj) {
 	return 0;
 }
 
-int computeMaps(OBJ_PTR obj, char * maps) {
+int computeMaps(OBJ_PTR obj, unsigned char *maps) {
 	//first, count the properties to decide the format
 	int count = 0;
 	FOREACH(obj->pHead, Property_PTR)
@@ -644,7 +674,7 @@ int computeMaps(OBJ_PTR obj, char * maps) {
 				counts[0]++;
 				maps[MAPOFF_N + counts[0]] = element->propcode;
 			} else {
-				flipPropertyBit(element->propcode, &maps[MAPOFF_N]);
+				flipPropertyBit(element->propcode, (char*) &maps[MAPOFF_N]);
 			}
 		}
 		if (element->rwn_mode & E_WRITE) {
@@ -652,7 +682,7 @@ int computeMaps(OBJ_PTR obj, char * maps) {
 				counts[1]++;
 				maps[MAPOFF_S + counts[1]] = element->propcode;
 			} else {
-				flipPropertyBit(element->propcode, &maps[MAPOFF_S]);
+				flipPropertyBit(element->propcode, (char*) &maps[MAPOFF_S]);
 			}
 		}
 		if (element->rwn_mode & E_READ) {
@@ -660,15 +690,14 @@ int computeMaps(OBJ_PTR obj, char * maps) {
 				counts[2]++;
 				maps[MAPOFF_G + counts[2]] = element->propcode;
 			} else {
-				flipPropertyBit(element->propcode, &maps[MAPOFF_G]);
+				flipPropertyBit(element->propcode, (char*) &maps[MAPOFF_G]);
 			}
 		}
 	}
 	return 0;
 }
 
-
-int computeListMaps(OBJ_PTR obj, char * maps) {
+int computeListMaps(OBJ_PTR obj, char *maps) {
 	FOREACH(obj->pHead, Property_PTR)
 	{
 		if (element->rwn_mode & E_NOTIFY) {
@@ -687,7 +716,7 @@ int computeListMaps(OBJ_PTR obj, char * maps) {
 	return 0;
 }
 
-int computeBinaryMaps(OBJ_PTR obj, char * maps) {
+int computeBinaryMaps(OBJ_PTR obj, char *maps) {
 	FOREACH(obj->pHead, Property_PTR)
 	{
 		if (element->rwn_mode & E_NOTIFY) {
@@ -710,7 +739,7 @@ int computeBinaryMaps(OBJ_PTR obj, char * maps) {
  * creates a basic object with properties 0x80, 0x81, 0x82, 0x88,
  * 0x8A, 0x9D, 0x9E, 0x9F
  */
-OBJ_PTR createBasicObject(char * eoj) {
+OBJ_PTR createBasicObject(char *eoj) {
 	OBJ_PTR base = createObject(eoj);
 	if (base == NULL) {
 		return NULL;
@@ -758,7 +787,7 @@ OBJ_PTR createNodeProfileObject() {
 	return node;
 }
 
-OBJ_PTR getObject(OBJ_PTR oHead, char * eoj) {
+OBJ_PTR getObject(OBJ_PTR oHead, char *eoj) {
 	FOREACH(oHead, OBJ_PTR)
 	{
 		if ( CMPEOJ(element->eoj, eoj) == 0) {
@@ -778,7 +807,7 @@ int computeNumberOfInstances(OBJ_PTR oHead) {
 	return num - 1;
 }
 
-int isClassPresent(char * buf, uint8_t * eoj) {
+int isClassPresent(unsigned char *buf, uint8_t *eoj) {
 	for (int i = 1; i < 17; i = i + 2) {
 		if (memcmp(&buf[i], eoj, 2) == 0) {
 			return i;
@@ -791,7 +820,7 @@ int isClassPresent(char * buf, uint8_t * eoj) {
  * param result the class result (exactly 17 bytes of length)
  * return number of classes +1 node profile
  */
-int computeClasses(OBJ_PTR oHead, char * result) {
+int computeClasses(OBJ_PTR oHead, unsigned char *result) {
 	if (result == NULL || oHead == NULL) {
 		return -1;
 	}
@@ -802,7 +831,7 @@ int computeClasses(OBJ_PTR oHead, char * result) {
 			if (result[0] >= 8) {
 				PPRINTF(
 						"compute classes: out of class list \
-						space, ignoring class...\n");
+						space, ignoring class...\r\n");
 			} else {
 				//check for node profile (exclude)
 				if (CMPEOJ(element->eoj, PROFILEEOJ)) {
@@ -817,7 +846,7 @@ int computeClasses(OBJ_PTR oHead, char * result) {
 	return result[0] + 1;
 }
 
-int isInstancePresent(char * buf, uint8_t *eoj) {
+int isInstancePresent(unsigned char *buf, uint8_t *eoj) {
 	for (int i = 1; i < E_INSTANCELISTSIZE; i = i + 3) {
 		if (memcmp(&buf[i], eoj, 3) == 0) {
 			return i;
@@ -826,7 +855,7 @@ int isInstancePresent(char * buf, uint8_t *eoj) {
 	return 0;
 }
 
-int computeInstances(OBJ_PTR oHead, char * result) {
+int computeInstances(OBJ_PTR oHead, unsigned char *result) {
 	if (result == NULL || oHead == NULL) {
 		return -1;
 	}
@@ -838,7 +867,7 @@ int computeInstances(OBJ_PTR oHead, char * result) {
 			if (result[0] >= (maxinstances)) {
 				PPRINTF(
 						"compute instances: out of space, \
-						ignoring instance\n");
+						ignoring instance\r\n");
 			} else {
 				//check for node profile (exclude)
 				if (CMPEOJ(element->eoj, PROFILEEOJ)) {
@@ -855,23 +884,23 @@ int computeInstances(OBJ_PTR oHead, char * result) {
 void computeNodeClassInstanceLists(OBJ_PTR oHead) {
 	OBJ_PTR profile = getObject(oHead, PROFILEEOJ);
 	if (profile == NULL) {
-		PPRINTF("compute classes and instances: NULL profile object\n");
+		PPRINTF("compute classes and instances: NULL profile object\r\n");
 		return;
 	}
 	Property_PTR prop = NULL;
 	int d3 = computeNumberOfInstances(oHead);
-	char d3buf[] = { 0, 0, d3 };
+	unsigned char d3buf[] = { 0, 0, d3 };
 	//d3 write
 	prop = getProperty(profile, 0xD3);
 	writeProperty(prop, 3, d3buf);
 
 	//class list and number of classes calculation
-	char * res = malloc(17);
+	unsigned char *res = malloc(17);
 	memset(res, 0, 17);
 	int d4 = computeClasses(oHead, res);
 	//d4 write
 	prop = getProperty(profile, 0xD4);
-	char d4buff[] = { 0, d4 };
+	unsigned char d4buff[] = { 0, d4 };
 	writeProperty(prop, 2, d4buff);
 	//d7 write
 	prop = getProperty(profile, 0xD7);
@@ -882,7 +911,7 @@ void computeNodeClassInstanceLists(OBJ_PTR oHead) {
 	//instance lists, common for d5,d6
 	res = malloc(E_INSTANCELISTSIZE);
 	memset(res, 0, E_INSTANCELISTSIZE);
-	int d5 = computeInstances(oHead, res);
+	computeInstances(oHead, res);
 	//d5 write
 	prop = getProperty(profile, 0xD5);
 	propsize = res[0] * 3 + 1; //3byte eojs + objcount (1byte)
@@ -966,6 +995,7 @@ ECHOFRAME_PTR getPerObjectResponse(ECHOFRAME_PTR incoming, OBJ_PTR obj) {
 		processWrite(incoming, res, obj);
 		break;
 	case ESV_GET:
+		PRINTF("ESV_GET\r\n");
 		res = initFrameResponse(incoming, obj->eoj, ECHOFRAME_MAXSIZE);
 		processRead(incoming, res, obj, E_READ);
 		break;
@@ -974,10 +1004,13 @@ ECHOFRAME_PTR getPerObjectResponse(ECHOFRAME_PTR incoming, OBJ_PTR obj) {
 		processRead(incoming, res, obj, E_NOTIFY | E_READ);
 		break;
 	case ESV_SETGET:
-		PPRINTF("TODO: SetGet not supported yet");
+		PPRINTF("TODO: SetGet not supported yet\r\n");
+		break;
+	case ESV_INF:
+		PPRINTF("Notification: ignore\r\n");
 		break;
 	default:
-		PPRINTF("pIF: Unrecognized ESV (%d), doing nothing\n", esv);
+		PPRINTF("pIF: Unrecognized ESV (%d), doing nothing\r\n", esv);
 	}
 	return res;
 }
@@ -1010,7 +1043,7 @@ OBJ_PTR matchObjects(OBJMATCH_PTR matcher) {
 	return NULL;
 }
 
-void * applyOutgoingHandler(HANDLER_PTR handler, ECHOFRAME_PTR outgoing) {
+void* applyOutgoingHandler(HANDLER_PTR handler, ECHOFRAME_PTR outgoing) {
 	if (handler->func) {
 		return handler->func(handler, outgoing);
 	} else {
@@ -1022,7 +1055,7 @@ void * applyOutgoingHandler(HANDLER_PTR handler, ECHOFRAME_PTR outgoing) {
 void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead,
 		HANDLER_PTR handler) {
 	if (parseFrame(incoming) != PR_OK) {
-		PPRINTF("bad echonet frame, dropping...");
+		PPRINTF("bad echonet frame, dropping...\r\n");
 		return;
 	}
 
@@ -1032,15 +1065,18 @@ void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead,
 	memset(matcher, 0, sizeof(OBJMATCH));
 	matcher->eoj = getDEOJ(incoming);
 	matcher->oHead = oHead;
+
+	PRINTF("\r\n*** INCOMING ESV: 0x%2x ***\r\n", incoming->data[OFF_ESV]);
+
 	while (matchObjects(matcher)) {
 		ECHOFRAME_PTR response = getPerObjectResponse(incoming,
 				matcher->lastmatch);
 		if (response) {
 			finalizeFrame(response);
 			//SEND THEM over the wire
-			PPRINTF("pIF: created a response: \n");
+			PPRINTF("pIF: created a response.. ");
 			if (handler) {
-				PPRINTF("pIF: applying handler\n");
+				PPRINTF("pIF: applying handler\r\n");
 				applyOutgoingHandler(handler, response);
 			} else {
 				free(response);
@@ -1050,15 +1086,15 @@ void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead,
 }
 
 typedef struct {
-	struct sockaddr_in * dst;
+	struct sockaddr_in *dst;
 	ECHOCTRL_PTR ectrl;
 } DEFAULTOUT, *DEFAULTOUT_PTR;
 
-void * defaultOut(HANDLER_PTR handler, void * outgoing) {
+void* defaultOut(HANDLER_PTR handler, void *outgoing) {
 	DEFAULTOUT_PTR dout = (DEFAULTOUT_PTR) handler->opt;
 	ECHOFRAME_PTR outframe = (ECHOFRAME_PTR) outgoing;
-	sendto(dout->ectrl->msock, outframe->data, outframe->used, 0, dout->dst,
-			sizeof(struct sockaddr_in));
+	sendto(dout->ectrl->msock, outframe->data, outframe->used, 0,
+			(struct sockaddr* ) dout->dst, sizeof(struct sockaddr_in));
 	freeFrame(outframe);
 	return NULL;
 }
@@ -1067,7 +1103,7 @@ void sendNotification(ECHOCTRL_PTR context, ECHOFRAME_PTR outgoing) {
 	if (context && outgoing) {
 		finalizeFrame(outgoing);
 		sendto(context->msock, outgoing->data, outgoing->used, 0,
-				(const struct sockaddr * ) &context->maddr,
+				(const struct sockaddr* ) &context->maddr,
 				sizeof(struct sockaddr));
 	}
 }
@@ -1080,7 +1116,7 @@ void makeNotification(Property_PTR property) {
 	//send a packet with the data from property
 	ECHOFRAME_PTR nframe = initFrame(ECHOFRAME_MAXSIZE, incTID(ectrl));
 	putEOJ(nframe, property->pObj->eoj);
-	putEOJ(nframe, (unsigned char *) PROFILEEOJ);
+	putEOJ(nframe, (unsigned char*) PROFILEEOJ);
 	putESVnOPC(nframe, ESV_INF);
 
 	int readres = putProperty(nframe, property);
@@ -1089,7 +1125,7 @@ void makeNotification(Property_PTR property) {
 		finalizeFrame(nframe);
 
 		sendto(ectrl->msock, nframe->data, nframe->used, 0,
-				(const struct sockaddr * ) &ectrl->maddr,
+				(const struct sockaddr* ) &ectrl->maddr,
 				sizeof(struct sockaddr));
 	}
 	freeFrame(nframe);
@@ -1100,10 +1136,10 @@ void receiveLoop(ECHOCTRL_PTR ectrl) {
 		PPRINTF(" R ");
 		socklen_t addrlen = sizeof(struct sockaddr_in);
 		int res = recvfrom(ectrl->msock, ectrl->buffer, ECHOCTRL_BUFSIZE, 0,
-				&ectrl->incoming, &addrlen);
-		PPRINTF("rL: received UDP packet\n");
+				(struct sockaddr* ) &ectrl->incoming, &addrlen);
+		PPRINTF("rL: received UDP packet\r\n");
 		if (res < -1) {
-			PPRINTF("recvfrom error\n");
+			PPRINTF("recvfrom error\r\n");
 		}
 
 		ECHOFRAME frame;

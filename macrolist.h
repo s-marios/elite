@@ -80,7 +80,7 @@ void * LREPLACE(void ** head_ptr, void * oldelem, void * newelem);
 /**
  * Index-based element get operation for a list.
  */
-void * LGET(void * head, uint index);
+void * LGET(void * head, uint16_t index);
 
 /**
  * Append an element to a List. Make sure you supply a reference to a
