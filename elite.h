@@ -9,73 +9,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "FreeRTOS.h"
-#include "semphr.h"
+#include "logging.h"
+#include "networking.h"
 
-#include "lwipopts.h"
-#include "lwip/sockets.h"
-/**
- * Debug printfs. Debug level of 0 (zero) suppresses all output. Debug level of
- * 1 enables PRINTF, 2 enables PPRINTF also.
- */
-//#define ELITE_DEBUG 2
-//#define PPRINTF printf
-#define PPRINTF(...)
-/**
- * if defined, web log functionality at port 6666 is enabled.
- */
-//#define DOWEBLOG
-
-#ifdef DOWEBLOG
-
-
-extern uint8_t ndsize; /**< last weblog data size */
-extern char ndbuf[256]; /**< buffer holding the data to be sent */
-/** semaphore protecting simultaneous writes */
-extern SemaphoreHandle_t debugdowrite;
-/** semaphore used to signal  the performance of a write */
-extern SemaphoreHandle_t debugsem;
-
-/** the web logging macro, usually mapped to PPRINTF */
-#define WEBLOG(...) do { \
-	if (debugsem) { \
-		xSemaphoreTake(debugdowrite, portMAX_DELAY); \
-		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
-		xSemaphoreGive(debugsem); \
-		xSemaphoreGive(debugdowrite); \
-	}\
-} while (0)
-
-#else
-#define WEBLOG
-#endif //DOWEBLOG
-
-#ifdef ELITE_DEBUG
-#undef PRINTF
-#ifdef DOWEBLOG
-#define PRINTF WEBLOG
-#else
-#define PRINTF printf
-#endif  //DOWEBLOG
-#endif //ELITE_DEBUG
-#if ELITE_DEBUG > 1
-#undef PPRINTF
-#ifdef DOWEBLOG
-#define PPRINTF WEBLOG
-#else
-#define PPRINTF printf
-#endif
-#endif
-
-#ifndef PRINTF
-#define PRINTF printf
-#endif
-
-/**
- * For use with IP4_ADDR only.
- */
-#define ELITE_MADDR 224, 0, 23, 0
-#define ELITE_PORT 3610
 
 //this is essentially forward declaration for the OBJ struct
 typedef struct OBJ OBJ;
@@ -151,7 +87,7 @@ typedef struct {
 /** maximum echoframe size */
 #define ECHOFRAME_MAXSIZE 255
 /**
- *  minimum possible echonet frame size.
+ *	minimum possible echonet frame size.
  *
  *frame should be at least 14 bytes or else discarded
  *header (2) + TID (2)+ SDEOJ (6)+ ESVOPC (2) + EPCPDC (2)
@@ -478,7 +414,7 @@ void addObject(ECHOCTRL_PTR ectrl, OBJ_PTR obj);
 #define setClassGroup(obj_ptr, val) (obj_ptr)->classgroup = val
 #define setClass(obj_ptr, val) (obj_ptr)->class = val
 #define setInstance(obj_ptr, val) (obj_ptr)->instance = val
-#define setEOJ(obj_ptr, eoj) 	do { \
+#define setEOJ(obj_ptr, eoj)	do { \
 	if (obj_ptr && eoj) { \
 		memcpy(obj_ptr->eoj, eoj, 3); \
 	} \
@@ -553,12 +489,12 @@ Property_PTR freeProperty(Property_PTR property);
 #define FREEPROPERTIES(head) while(head){head = freeProperty(head);}
 
 /**
- *  Create a property.
- *  @param mode the access mode (or'ed bitfield)
- *  @param propcode the property code
- *  @return a pointer to the property, NULL on failure.
+ * Create a property.
+ * @param mode the access mode (or'ed bitfield)
+ * @param propcode the property code
+ * @return a pointer to the property, NULL on failure.
  *
- *  @see E_WRITEMODE for the mode
+ * @see E_WRITEMODE for the mode
  */
 Property_PTR createProperty(uint8_t propcode, uint8_t mode);
 

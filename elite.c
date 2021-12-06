@@ -4,6 +4,7 @@
  * This is the bulk of the ECHONET Lite implementation.
  */
 #include <stdio.h>
+#include <stdint.h>
 //sshhh... no malloc now, only stdlib...
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,7 @@ ECHOFRAME_PTR allocateFrame(size_t alocsize) {
 }
 
 ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, unsigned char *data,
-		size_t length) {
+                                size_t length) {
 	if (frame == NULL) {
 		return NULL;
 	}
@@ -53,14 +54,23 @@ ECHOCTRL_PTR createEchonetControl() {
 	ECHOCTRL_PTR ecptr = malloc(sizeof(ECHOCTRL));
 	memset(ecptr, 0, sizeof(ECHOCTRL));
 	ecptr->TID = 1;
+	//settign up multicast socket
+#ifdef __unix__
+	if (inet_aton(ELITE_MADDR, &ecptr->maddr.sin_addr) == 0) {
+		PRINTF("SHOULD NOT HAPPEN: failed to convert ip");
+	}
+	ecptr->maddr.sin_family = AF_INET;
+	ecptr->maddr.sin_port = ntohs(ELITE_PORT);
+
+#else
 	ip_addr_t dummy;
 	IP4_ADDR(&dummy, 224, 0, 23, 0);
 
 	ecptr->maddr.sin_addr.s_addr = dummy.addr;
+	ecptr->maddr.sin_len = 0;
+#endif
 	ecptr->maddr.sin_family = AF_INET;
 	ecptr->maddr.sin_port = ntohs(ELITE_PORT);
-	//for safety?
-	ecptr->maddr.sin_len = 0;
 	ecptr->msock = -1;
 	return ecptr;
 }
@@ -173,7 +183,7 @@ ESV getAffirmativeESV(ESV esv) {
 }
 
 ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char *eoj,
-		size_t alocsize) {
+                                size_t alocsize) {
 	if (incoming == NULL) {
 		return NULL;
 	}
@@ -206,8 +216,8 @@ uint16_t getShort(ECHOFRAME_PTR fptr, uint16_t offset) {
 }
 
 void dumpFrame(ECHOFRAME_PTR fptr) {
-	PRINTF("Frame info used, allocated, propNum: %d %d %d\n", fptr->used,
-			fptr->allocated, fptr->propNum);
+	PRINTF("Frame info used, allocated, propNum: %ld %ld %d\n", fptr->used,
+	       fptr->allocated, fptr->propNum);
 	PRINTF("Data: ");
 	for (int i = 0; i < fptr->used; i++) {
 		PRINTF("\\0x%02x", fptr->data[i]);
@@ -389,7 +399,7 @@ int readProperty(Property_PTR property, uint8_t size, unsigned char *buf) {
 }
 
 int requiresNotification(Property_PTR property, uint8_t size,
-		const unsigned char *buff);
+                         const unsigned char *buff);
 
 /**
  * return bytes written, zero or less on failure
@@ -421,7 +431,7 @@ int writeProperty(Property_PTR property, uint8_t size, const unsigned char *buf)
 }
 
 int requiresNotification(Property_PTR property, uint8_t size,
-		const unsigned char *incoming) {
+                         const unsigned char *incoming) {
 	unsigned char readbuffer[size];
 	//tricky: zero read bytes considered too
 	if (readProperty(property, size, readbuffer) <= 0) {
@@ -528,7 +538,7 @@ int writeData(Property_PTR property, uint8_t size, const unsigned char *buf) {
 }
 
 int writeDataExact(Property_PTR property, uint8_t size,
-		const unsigned char *buf) {
+                   const unsigned char *buf) {
 	DATABUFFER_PTR databuffer = (DATABUFFER_PTR) property->opt;
 	if (size != databuffer->maxsize) {
 		return 0;
@@ -540,7 +550,7 @@ int writeDataExact(Property_PTR property, uint8_t size,
 }
 
 Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
-		uint8_t datasize, char *data) {
+                                uint8_t datasize, char *data) {
 	Property_PTR property = createProperty(propcode, rwn);
 	if (property == NULL) {
 		return NULL;
@@ -745,12 +755,12 @@ OBJ_PTR createBasicObject(char *eoj) {
 		return NULL;
 	}
 	addProperty(base,
-			createDataProperty(0x80, E_READ | E_NOTIFY, 1, 1, "\x30"));
+	            createDataProperty(0x80, E_READ | E_NOTIFY, 1, 1, "\x30"));
 	addProperty(base,
-			createDataProperty(0x81, E_READ | E_WRITE | E_NOTIFY, 1, 1, NULL));
+	            createDataProperty(0x81, E_READ | E_WRITE | E_NOTIFY, 1, 1, NULL));
 	addProperty(base, createDataProperty(0x82, E_READ, 4, 4, "\0\0H\0"));
 	addProperty(base,
-			createDataProperty(0x88, E_READ | E_NOTIFY, 1, 1, "\x42"));
+	            createDataProperty(0x88, E_READ | E_NOTIFY, 1, 1, "\x42"));
 	addProperty(base, createDataProperty(0x8A, E_READ, 3, 3, "AAA"));
 	addProperty(base, createDataProperty(0x9D, E_READ | E_NOTIFY, 17, 0, NULL));
 	addProperty(base, createDataProperty(0x9E, E_READ | E_NOTIFY, 17, 0, NULL));
@@ -769,20 +779,20 @@ OBJ_PTR createNodeProfileObject() {
 	addProperty(node, createDataProperty(0x9F, E_READ | E_NOTIFY, 17, 0, NULL));
 	//class properties
 	addProperty(node,
-			createDataProperty(0x80, E_READ | E_NOTIFY, 1, 1, "\x30"));
+	            createDataProperty(0x80, E_READ | E_NOTIFY, 1, 1, "\x30"));
 	addProperty(node,
-			createDataProperty(0x82, E_READ, 4, 4, "\x01\0x0C\0x01\x00"));
+	            createDataProperty(0x82, E_READ, 4, 4, "\x01\0x0C\0x01\x00"));
 	addProperty(node,
-			createDataProperty(0x83, E_READ, 17, 17,
-					"\x31\x32\x33\x34\x35\x36\x37\x38\x39\x30\x31\x32\x33\x34\x35\x36\x37"));
+	            createDataProperty(0x83, E_READ, 17, 17,
+	                               "\x31\x32\x33\x34\x35\x36\x37\x38\x39\x30\x31\x32\x33\x34\x35\x36\x37"));
 	addProperty(node, createDataProperty(0xD3, E_READ | E_NOTIFY, 3, 0, NULL));
 	addProperty(node, createDataProperty(0xD4, E_READ | E_NOTIFY, 2, 0, NULL));
 	addProperty(node,
-			createDataProperty(0xD5, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0,
-			NULL));
+	            createDataProperty(0xD5, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0,
+	                               NULL));
 	addProperty(node,
-			createDataProperty(0xD6, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0,
-			NULL));
+	            createDataProperty(0xD6, E_READ | E_NOTIFY, E_INSTANCELISTSIZE, 0,
+	                               NULL));
 	addProperty(node, createDataProperty(0xD7, E_READ | E_NOTIFY, 17, 0, NULL));
 	return node;
 }
@@ -830,7 +840,7 @@ int computeClasses(OBJ_PTR oHead, unsigned char *result) {
 		if (!isClassPresent(result, element->eoj)) {
 			if (result[0] >= 8) {
 				PPRINTF(
-						"compute classes: out of class list \
+				    "compute classes: out of class list \
 						space, ignoring class...\r\n");
 			} else {
 				//check for node profile (exclude)
@@ -866,7 +876,7 @@ int computeInstances(OBJ_PTR oHead, unsigned char *result) {
 		if (!isInstancePresent(result, element->eoj)) {
 			if (result[0] >= (maxinstances)) {
 				PPRINTF(
-						"compute instances: out of space, \
+				    "compute instances: out of space, \
 						ignoring instance\r\n");
 			} else {
 				//check for node profile (exclude)
@@ -929,7 +939,7 @@ int processWrite(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj) {
 	while (getNextEPC(incoming, &parsedepc)) {
 		Property_PTR property = getProperty(obj, parsedepc.epc);
 		if (property
-				&& writeProperty(property, parsedepc.pdc, parsedepc.edt) > 0) {
+		        && writeProperty(property, parsedepc.pdc, parsedepc.edt) > 0) {
 			//property exists and write succeeded
 			if (response) { //SETI generates no response
 				putEPC(response, property->propcode, 0, NULL);
@@ -950,7 +960,7 @@ int processWrite(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj) {
 }
 
 int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj,
-		E_WRITEMODE rwn) {
+                E_WRITEMODE rwn) {
 	if (response == NULL) {
 		return -2;
 	}
@@ -990,7 +1000,7 @@ ECHOFRAME_PTR getPerObjectResponse(ECHOFRAME_PTR incoming, OBJ_PTR obj) {
 	switch (esv) {
 	case ESV_SETC: //intentional fall through.
 		res = initFrameResponse(incoming, obj->eoj, ECHOFRAME_MAXSIZE);
-		//intentional!
+	//intentional!
 	case ESV_SETI:
 		processWrite(incoming, res, obj);
 		break;
@@ -1053,7 +1063,7 @@ void* applyOutgoingHandler(HANDLER_PTR handler, ECHOFRAME_PTR outgoing) {
 }
 
 void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead,
-		HANDLER_PTR handler) {
+                          HANDLER_PTR handler) {
 	if (parseFrame(incoming) != PR_OK) {
 		PPRINTF("bad echonet frame, dropping...\r\n");
 		return;
@@ -1070,7 +1080,7 @@ void processIncomingFrame(ECHOFRAME_PTR incoming, OBJ_PTR oHead,
 
 	while (matchObjects(matcher)) {
 		ECHOFRAME_PTR response = getPerObjectResponse(incoming,
-				matcher->lastmatch);
+		                         matcher->lastmatch);
 		if (response) {
 			finalizeFrame(response);
 			//SEND THEM over the wire
@@ -1094,7 +1104,7 @@ void* defaultOut(HANDLER_PTR handler, void *outgoing) {
 	DEFAULTOUT_PTR dout = (DEFAULTOUT_PTR) handler->opt;
 	ECHOFRAME_PTR outframe = (ECHOFRAME_PTR) outgoing;
 	sendto(dout->ectrl->msock, outframe->data, outframe->used, 0,
-			(struct sockaddr* ) dout->dst, sizeof(struct sockaddr_in));
+	       (struct sockaddr* ) dout->dst, sizeof(struct sockaddr_in));
 	freeFrame(outframe);
 	return NULL;
 }
@@ -1103,8 +1113,8 @@ void sendNotification(ECHOCTRL_PTR context, ECHOFRAME_PTR outgoing) {
 	if (context && outgoing) {
 		finalizeFrame(outgoing);
 		sendto(context->msock, outgoing->data, outgoing->used, 0,
-				(const struct sockaddr* ) &context->maddr,
-				sizeof(struct sockaddr));
+		       (const struct sockaddr* ) &context->maddr,
+		       sizeof(struct sockaddr));
 	}
 }
 
@@ -1125,8 +1135,8 @@ void makeNotification(Property_PTR property) {
 		finalizeFrame(nframe);
 
 		sendto(ectrl->msock, nframe->data, nframe->used, 0,
-				(const struct sockaddr* ) &ectrl->maddr,
-				sizeof(struct sockaddr));
+		       (const struct sockaddr* ) &ectrl->maddr,
+		       sizeof(struct sockaddr));
 	}
 	freeFrame(nframe);
 }
@@ -1136,7 +1146,7 @@ void receiveLoop(ECHOCTRL_PTR ectrl) {
 		PPRINTF(" R ");
 		socklen_t addrlen = sizeof(struct sockaddr_in);
 		int res = recvfrom(ectrl->msock, ectrl->buffer, ECHOCTRL_BUFSIZE, 0,
-				(struct sockaddr* ) &ectrl->incoming, &addrlen);
+		                   (struct sockaddr* ) &ectrl->incoming, &addrlen);
 		PPRINTF("rL: received UDP packet\r\n");
 		if (res < -1) {
 			PPRINTF("recvfrom error\r\n");
