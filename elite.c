@@ -497,7 +497,7 @@ int comparePropertyCode(void *prop, void *code) {
 	if (prop == NULL) {
 		return INT_MIN;
 	}
-	return ((Property_PTR) prop)->propcode - (int) code;
+	return ((Property_PTR) prop)->propcode - (size_t) code;
 }
 
 void initTestProperty(Property_PTR property) {
@@ -619,7 +619,7 @@ void flipPropertyBit(uint8_t code, char *pbitmap) {
 }
 
 Property_PTR getProperty(OBJ_PTR obj, uint8_t code) {
-	return (Property_PTR) LFIND(obj->pHead, (void *) code, comparePropertyCode);
+	return (Property_PTR) LFIND(obj->pHead, (void *) (size_t) code, comparePropertyCode);
 }
 
 void copyBitmapsToProperties(OBJ_PTR obj, const unsigned char *rawmaps) {
