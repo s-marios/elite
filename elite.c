@@ -54,7 +54,8 @@ ECHOCTRL_PTR createEchonetControl() {
 	ECHOCTRL_PTR ecptr = malloc(sizeof(ECHOCTRL));
 	memset(ecptr, 0, sizeof(ECHOCTRL));
 	ecptr->TID = 1;
-	//settign up multicast socket
+	//settign up multicast address
+	//the socket is not setup here!
 #ifdef __unix__
 	if (inet_aton(ELITE_MADDR, &ecptr->maddr.sin_addr) == 0) {
 		PRINTF("SHOULD NOT HAPPEN: failed to convert ip");

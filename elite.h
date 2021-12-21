@@ -1,7 +1,76 @@
 /**
  * \file
  *
- * Inclusion file for ECHONET Lite functionality.
+ * Main header file for ECHONET Lite functionality. You should not have to
+ * include any file other than this to use ELITE.
+ */
+
+/**
+ *
+ * \mainpage ELITE landing page
+ *
+ * This is the landing page of the ELITE documentation. Read the following
+ * section for a \ref how_to.
+ *
+ * \section how_to Simple How-To
+ *
+ * This is a brief introduction on how to use this library. Depending on your platform
+ * the details will be different, but here are the common steps of any ELITE application:
+ *
+ * - Setup an ELITE context (i.e. an \ref ECHOCTRL block).
+ * - Setup your multicast socket.
+ * - Setup ECHONET Lite objects and properties.
+ *
+ * It is necessary to inlcude the file elite.h in your program.
+ *
+ * ======
+ *
+ * \subsection setup_context Setup an ELITE Context
+ *
+ * An ELITE context is used to interact with any of the functionality used
+ * by ELITE. This context is an \ref ECHOCTRL struct. Memory allocation and
+ * partial initialization for this struct is achieved using the
+ * \ref createEchonetControl function.
+ *
+ * \subsection setup_msocket Setup a multicast socket.
+ *
+ * The socket used by ELITE is a UDP socket that has joined the multicast
+ * network for ECHONET Lite devices. Linux and lwip provide a socket API.
+ * However, there are slight differences in data structures and ioctl.
+ * On linux, You'll need to call socket(), bind() and setsockopt(), the
+ * last one with IP_ADD_MEMBERSHIP to join the multicast network.
+ *
+ * Enabling multicast reception may need further initialization steps
+ * deptending on your microcontroller. Consult the documentation for your
+ * platform.
+ *
+ * After initializing the socket, assign it to the \ref ECHOCTRL_PTR::msock
+ * member of the ELITE context.
+ *
+ * \subsection setup_objects Setup ECHONET Lite Objects
+ *
+ * For each ECHONET Lite object:
+ *
+ * - Create an object using the call \ref createBasicObject()
+ * - Add the desired properties using the function \ref addProperty()
+ * - After you've finiished adding properties, call \ref computePropertyMaps()
+ * - After you've computed the property maps, register the object with the
+ *   ECHONET Lite context using \ref addObject().
+ *
+ * The same rules apply for the special profile object, that has to be set up
+ * manually. To set up the profile object:
+ *
+ * - Create the profile object using \ref createNodeProfileObject()
+ * - Add any extra properties you want
+ * - Call \ref computePropertyMaps()
+ * - Register it with the ECHONET Lite context using \ref addObject()
+ *
+ *
+ * Finally, after all objects have been created and registered, you *have to*
+ * compute the class and instance lists (properties d3, d4, d5, d6, d7) using
+ * computeNodeClassInstanceLists()
+ *
+ *
  */
 #ifndef ELITE_H
 #define ELITE_H
@@ -26,28 +95,33 @@ typedef struct HANDLER HANDLER;
 typedef struct HANDLER *HANDLER_PTR;
 
 /**
- * definition of the function that processes outgoing frames. This handler
+ * Definition of the function that processes outgoing frames. This handler
  * is responsible for freeing the outgoing packet. Optional arguments to this
- * can be found in handler->opt.
+ * can be found in handler->opt. A handler that send packets on the network
+ * is the default setup, but it can be substituted with something different
+ * for testing purposes.
  */
 typedef void* (*PROCESSORFUNC)(HANDLER_PTR handler, void *outgoing);
 
 struct HANDLER {
-	PROCESSORFUNC func; /**< the processing function pointer that will be used */
-	void *opt; /**< optional arguments used by func */
+	PROCESSORFUNC func; /**< The processing function pointer that will be used */
+	void *opt; /**< Optional arguments used by func */
 };
 
 /**
- * This is the overall control structure for ECHONET Lite operations
+ * This is the overall control structure for ECHONET Lite operations. Holds
+ * information like the multicast socket used for communications, a list of
+ * the registered ECHONET Lite objest, a transaction ID counter among other
+ * things.
  */
 typedef struct {
-	int msock; /**< multicast socket */
-	struct sockaddr_in maddr; /**< echonet lite multicast addr **/
-	struct sockaddr_in incoming; /**< holds the address of incoming packets */
+	int msock; /**< Multicast socket used for network communications */
+	struct sockaddr_in maddr; /**< ECHONET Lite multicast address */
+	struct sockaddr_in incoming; /**< Holds the address of incoming packets */
 
 	uint16_t TID; /**< Transaction ID */
-	OBJ_PTR oHead; /**< the head of the Objects list */
-	struct HANDLER sendHandler; /**< the handler for outgoing packets */
+	OBJ_PTR oHead; /**< Head of the ECHONET Lite Objects list */
+	struct HANDLER sendHandler; /**< Handler for outgoing packets */
 
 #define ECHOCTRL_BUFSIZE 256
 	/**
@@ -59,13 +133,14 @@ typedef struct {
 } ECHOCTRL, *ECHOCTRL_PTR;
 
 /**
- * Create an echonet control context that holds all necessary information.
+ * Allocate an echonet control context and set default values to its fields
+ * (warning: it does *not* initialize the multicast socket).
  */
 ECHOCTRL_PTR createEchonetControl();
 
 /**
  * Increases and returns the next transaction id.
- * @param cptr the echonet lite control context
+ * @param cptr the ECHONET Lite control context
  * @return the new transaction id, ready to be used in a frame.
  */
 uint16_t incTID(ECHOCTRL_PTR cptr);
@@ -95,7 +170,7 @@ typedef struct {
 #define ECHOFRAME_MINSIZE 14
 
 /**
- * enum holding the various ESV services of echonet lite.
+ * enum holding the various ESV services of ECHONET Lite.
  */
 typedef enum {
 	ESV_SETI = 0x60,
@@ -196,7 +271,7 @@ int putByte(ECHOFRAME_PTR fptr, char byte);
  */
 int putBytes(ECHOFRAME_PTR fptr, uint8_t num, unsigned char *data);
 
-/** Put a short (two byte integer) in an echonet lite frame.
+/** Put a short (two byte integer) in an ECHONET Lite frame.
  *
  * @param fptr the echonet frame pointer to put the data into
  * @param aShort the short to put
@@ -291,7 +366,7 @@ typedef enum {
 } OFFSETS;
 
 /**
- * Parses an echonet lite frame.
+ * Parses an ECHONET Lite frame.
  * @param fptr the frame to parse.
  * @result the result of parsing (on success it is #PR_OK).
  * @see PARSERESULT
@@ -377,7 +452,7 @@ struct Property {
 #define instance eoj[2]
 
 /**
- * The structure that represents an echonet lite object in the code. Has an
+ * The structure that represents an ECHONET Lite object in the code. Has an
  * EOJ, the head of the property list it contains, the next object in the node
  * as well as a pointer to the context it is managed by. This structure can be
  * used with the macrolist functions, with the next field holding the next
@@ -403,10 +478,10 @@ void freeObject(OBJ_PTR obj);
 OBJ_PTR createObject(char *eoj);
 
 /**
- * Register an object with the echonet lite context. Use this during the
+ * Register an object with the ECHONET Lite context. Use this during the
  * initial setup of objects.
  *
- * @param ectrl the echonet lite context
+ * @param ectrl the ECHONET Lite context
  * @param obj the object to register
  */
 void addObject(ECHOCTRL_PTR ectrl, OBJ_PTR obj);
@@ -554,7 +629,7 @@ OBJ_PTR createNodeProfileObject();
  * Compute the contents of properties D3, D4, D5, D6, D7 of the node
  * profile object. Use this at the end of object initialization.
  *
- * @param the head of the echonet lite object list (found in the control context).
+ * @param oHead the head of the ECHONET Lite object list (found in the control context).
  */
 void computeNodeClassInstanceLists(OBJ_PTR oHead);
 
@@ -567,7 +642,7 @@ void computeNodeClassInstanceLists(OBJ_PTR oHead);
 OBJ_PTR getObject(OBJ_PTR oHead, char *eoj);
 /**
  * Macro for getting an object by passing in the elite control structure directly
- * @param ctrl the echonet lite control context
+ * @param ctrl the ECHONET Lite control context
  * @param eoj the eoj to search for
  */
 #define GETOBJECT(ctrl, eoj) getObject(ctrl->oHead, eoj)
@@ -582,7 +657,7 @@ OBJ_PTR getObject(OBJ_PTR oHead, char *eoj);
 /**
  * Iterator structure for matching multiple objects. Used with matchObjects.
  * Setup oHead and eoj appropriately before usage. oHead set to the head of the
- * echonet lite object list, eoj the desired eoj. If eoj instance code is zero,
+ * ECHONET Lite object list, eoj the desired eoj. If eoj instance code is zero,
  * multimatch all objects only on classgroup/class code (match all instances).
  * @see matchObjects
  */
@@ -603,7 +678,7 @@ OBJ_PTR matchObjects(OBJMATCH_PTR matcher);
 
 /**
  * The main receiving loop. Call this when you are ready to receive
- * echonet lite udp packets.
+ * ECHONET Lite UDP packets.
  */
 void receiveLoop(ECHOCTRL_PTR ectrl);
 
