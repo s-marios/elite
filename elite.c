@@ -16,7 +16,7 @@
 #include "macrolist.h"
 
 ECHOFRAME_PTR allocateFrame(size_t alocsize) {
-	if (alocsize <= 0 || alocsize > ECHOFRAME_MAXSIZE) {
+	if (alocsize > ECHOFRAME_MAXSIZE) {
 		alocsize = ECHOFRAME_STDSIZE;
 	}
 	ECHOFRAME_PTR fptr = (ECHOFRAME_PTR) malloc(alocsize + sizeof(ECHOFRAME));
@@ -44,7 +44,7 @@ ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, unsigned char *data,
 uint16_t incTID(ECHOCTRL_PTR cptr) {
 	uint16_t result = cptr->TID;
 	cptr->TID++;
-	if (cptr == 0) {
+	if (cptr->TID == 0) {
 		cptr->TID++;
 	}
 	return result;
@@ -84,7 +84,6 @@ int putBytes(ECHOFRAME_PTR fptr, uint8_t num, unsigned char *data) {
 	if (checkSize(fptr, num)) {
 		return -1;
 	}
-	//memmove(&ECHOFRAME_HEAD(fptr), data, num);
 	memcpy(&fptr->data[fptr->used], data, num);
 	fptr->used += num;
 	return 0;
@@ -143,19 +142,7 @@ int putESVnOPC(ECHOFRAME_PTR fptr, ESV esv) {
 }
 
 void finalizeFrame(ECHOFRAME_PTR fptr) {
-	//setByteAt function necessary?
 	fptr->data[OFF_OPC] = fptr->propNum;
-}
-
-ECHOFRAME_PTR initFrameDepr(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID) {
-	ECHOFRAME_PTR fptr = allocateFrame(alocsize);
-	putByte(fptr, E_HD1);
-	putByte(fptr, E_HD2);
-	if (TID == 0) {
-		TID = incTID(cptr);
-	}
-	putShort(fptr, TID);
-	return fptr;
 }
 
 ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID) {
@@ -209,7 +196,7 @@ ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char *eoj,
 }
 
 uint16_t getShort(ECHOFRAME_PTR fptr, uint16_t offset) {
-	if (offset < 0 || offset > fptr->used) {
+	if (offset > fptr->used) {
 		return 0xffff;
 	} else {
 		return (fptr->data[offset] << 8 | fptr->data[offset + 1]);
@@ -217,7 +204,7 @@ uint16_t getShort(ECHOFRAME_PTR fptr, uint16_t offset) {
 }
 
 void dumpFrame(ECHOFRAME_PTR fptr) {
-	PRINTF("Frame info used, allocated, propNum: %ld %ld %d\n", fptr->used,
+	PRINTF("Frame info used, allocated, propNum: %zu %zu %d\n", fptr->used,
 	       fptr->allocated, fptr->propNum);
 	PRINTF("Data: ");
 	for (int i = 0; i < fptr->used; i++) {
@@ -281,9 +268,9 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 
 	PARSE_EPC epc;
 	memset(&epc, 0, sizeof(PARSE_EPC));
-	int skipResult = 1;
 	unsigned char *curProp = &fptr->data[index];
-	while (skipResult) {
+
+	for (;;) {
 		//parse data into EPC struct
 		//which property is this? first second etc.
 		epc.propIndex++;
@@ -300,10 +287,10 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 		}
 
 		PPRINTF("EPC: 0x%2x %d\n", epc.epc, epc.pdc);
+
 		//all thing accounted for?
 		if (index < fptr->used) {
 			PPRINTF("readin next prop...\r\n");
-			skipResult = 1;
 			curProp = &fptr->data[index];
 			continue;
 		} else if (index == fptr->used) {
@@ -317,7 +304,8 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr) {
 				//we were about to read more properties.
 				return PR_TOOLONG;
 			}
-		} else if (index > fptr->used) {
+		} else {
+			// index > fptr->used
 			PPRINTF("packet parsing too long...\r\n");
 			return PR_TOOLONG;
 		}
@@ -590,7 +578,8 @@ Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 
 	if (datasize < maxsize) {
 		property->writef = writeData;
-	} else if (datasize == maxsize) {
+	} else  {
+		// datasize == maxsize case
 		property->writef = writeDataExact;
 	}
 	property->readf = readData;
@@ -625,9 +614,8 @@ Property_PTR getProperty(OBJ_PTR obj, uint8_t code) {
 
 void copyBitmapsToProperties(OBJ_PTR obj, const unsigned char *rawmaps) {
 	uint8_t codes[] = { 0x9D, 0x9E, 0x9F };
-	Property_PTR prop;
 	for (int i = 0; i < sizeof(codes); i++) {
-		prop = getProperty(obj, codes[i]);
+		Property_PTR prop = getProperty(obj, codes[i]);
 
 		//the size of the buffer. Account for list/binary format.
 		uint8_t size = 1 + rawmaps[i * 17];
@@ -647,11 +635,12 @@ int computeMaps(OBJ_PTR obj, unsigned char *maps);
 int computePropertyMaps(OBJ_PTR obj) {
 	//in order: notify, set, get rawmaps
 	unsigned char *rawmaps = malloc(3 * 17);
-	memset(rawmaps, 0, 3 * 17);
 	if (rawmaps == NULL) {
 		PRINTF("run out of memory.");
 		return -1;
 	}
+
+	memset(rawmaps, 0, 3 * 17);
 
 	computeMaps(obj, rawmaps);
 	copyBitmapsToProperties(obj, rawmaps);
@@ -965,7 +954,8 @@ int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj,
 	if (response == NULL) {
 		return -2;
 	}
-	uint8_t readres;
+
+	int readres;
 	PARSE_EPC parsedepc;
 	memset(&parsedepc, 0, sizeof(parsedepc));
 	while (getNextEPC(incoming, &parsedepc)) {
@@ -973,7 +963,9 @@ int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj,
 		if (property && (property->rwn_mode & rwn)) {
 
 			readres = putProperty(response, property);
+
 			if (readres < 0) {
+				// failed to read the property!
 				putEPC(response, parsedepc.epc, 0, NULL);
 				//change ESV to failure
 				setESV(response, getESV(incoming) - 0x10);

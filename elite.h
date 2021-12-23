@@ -226,11 +226,6 @@ ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, unsigned char *data,
 		size_t length);
 
 /**
- * @Deprecated
- * Do not use.
- */
-ECHOFRAME_PTR initFrameDepr(ECHOCTRL_PTR cptr, size_t alocsize, uint16_t TID);
-/**
  * Init an echonet frame. Sets up the first two bytes of the header and the TID.
  *
  * @param alocsize the size used for the data section
@@ -278,6 +273,7 @@ int putBytes(ECHOFRAME_PTR fptr, uint8_t num, unsigned char *data);
  * @return zero on success, -1 in failure.
  */
 int putShort(ECHOFRAME_PTR fptr, uint16_t aShort);
+
 /**
  * Copies the contents of a property into the buffer.
  * If the internal readProperty fails, buffer remains unchanged.
@@ -306,6 +302,7 @@ uint16_t getShort(ECHOFRAME_PTR fptr, uint16_t offset);
  * @return zero on success, -1 on failure.
  */
 int putEOJ(ECHOFRAME_PTR fptr, EOJ eoj);
+
 /**
  * Put an EPC "type-length-value" in a frame.
  * @param fptr the echonet frame pointer to put data into
@@ -316,6 +313,7 @@ int putEOJ(ECHOFRAME_PTR fptr, EOJ eoj);
  * \todo setup error checking.
  */
 int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, unsigned char *data);
+
 /**
  * Put the esv and take the space for the operand count at the same time.
  * @param fptr the echonet frame
@@ -324,6 +322,7 @@ int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, unsigned char *data);
  * \todo setup error checking.
  */
 int putESVnOPC(ECHOFRAME_PTR fptr, ESV esv);
+
 /**
  * set the ESV of a frame. Rarely used, when creating a frame use putESVnOPC() @see putESVnOPC.
  */
@@ -470,6 +469,7 @@ struct OBJ {
  * frees an object. Rarely used.
  */
 void freeObject(OBJ_PTR obj);
+
 /**
  * Create an object with the given EOJ.
  * @param eoj the eoj of the object to create
@@ -589,18 +589,9 @@ Property_PTR createProperty(uint8_t propcode, uint8_t mode);
 Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 		uint8_t dataSize, char *data);
 
-/** this should not be public, do not use \todo hide */
-int compareProperties(void *prop, void *other);
-/** this should not be public do not use \todo hide */
-int comparePropertyCode(void *prop, void *code);
-
-/** testing read function, for some testing, do not use \todo remove*/
-int testRead(Property_PTR property, uint8_t size, unsigned char *buf);
-/** test property do not use \todo remove*/
-void initTestProperty(Property_PTR property);
-
 /** flips the appropriate bit for a property code in a bitmap */
 void flipPropertyBit(uint8_t code, char *pbitmap);
+
 /**
  * This function computes the property maps for this object and
  * writes the corresponding properties (9d,9e,9f). Make sure to
@@ -640,6 +631,7 @@ void computeNodeClassInstanceLists(OBJ_PTR oHead);
  * @return a pointer to the object found, NULL otherwise.
  */
 OBJ_PTR getObject(OBJ_PTR oHead, char *eoj);
+
 /**
  * Macro for getting an object by passing in the elite control structure directly
  * @param ctrl the ECHONET Lite control context
