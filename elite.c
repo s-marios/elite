@@ -3,6 +3,12 @@
  *
  * This is the bulk of the ECHONET Lite implementation.
  */
+
+//silence inet_aton warning
+#ifdef __unix
+#define _DEFAULT_SOURCE 1
+#endif
+
 #include <stdio.h>
 #include <stdint.h>
 //sshhh... no malloc now, only stdlib...
@@ -56,7 +62,7 @@ ECHOCTRL_PTR createEchonetControl() {
 	ecptr->TID = 1;
 	//settign up multicast address
 	//the socket is not setup here!
-#ifdef __unix__
+#ifdef __unix
 	if (inet_aton(ELITE_MADDR, &ecptr->maddr.sin_addr) == 0) {
 		PRINTF("SHOULD NOT HAPPEN: failed to convert ip");
 	}

@@ -5,10 +5,9 @@
 #define ELITE_PORT 3610
 
 
-#ifdef __unix__
+#ifdef __unix
 //unix/linux stuff here
 
-#define _DEFAULT_SOURCE 1
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

@@ -1,7 +1,7 @@
 #ifndef LOGGING_H
 #define LOGGING_H
 
-#ifdef __unix__
+#ifdef __unix
 //just to get us working on linux
 
 #include <stdio.h>
