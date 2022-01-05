@@ -87,7 +87,7 @@ int checkSize(ECHOFRAME_PTR fptr, size_t increase) {
 }
 
 int putBytes(ECHOFRAME_PTR fptr, uint8_t num, unsigned char *data) {
-	if (checkSize(fptr, num)) {
+	if (checkSize(fptr, num) || data == NULL) {
 		return -1;
 	}
 	memcpy(&fptr->data[fptr->used], data, num);
