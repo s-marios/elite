@@ -574,6 +574,13 @@ Property_PTR freeProperty(Property_PTR property);
 Property_PTR createProperty(uint8_t propcode, uint8_t mode);
 
 /**
+ * \deprecated
+ *
+ * Use createDataProperty2 instead.
+ *
+ * This function is deprecated because it cannot express the case of
+ * initial data that have datasize == maxsize but with UP TO semantics.
+ *
  * Creates a pure data property that stores data. If maxsize == dataSize
  * this property accepts EXACTLY maxsize bytes of info, no more no less
  * if maxsize > datasize this property accepts UP TO maxsize bytes (i.e.
@@ -588,6 +595,29 @@ Property_PTR createProperty(uint8_t propcode, uint8_t mode);
  */
 Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 		uint8_t dataSize, char *data);
+
+typedef enum storage_spec {
+	STORAGE_EXACT, STORAGE_UPTO
+} storage_spec_e;
+
+/**
+ * Creates a pure data property that stores data. Specify the
+ * storage behavior using STORAGE_EXACT and STORAGE_UPTO.
+ *
+ * STORAGE_UPTO specifies that writes with dataSize <= maxSize
+ * will be accepted. STORAGE_EXACT specifies that only writes
+ * with dataSize == maxSize will be accepted.
+ *
+ * Initial NULL data acceptable in both scenarios.
+ *
+ * @param propcode property code
+ * @param rwn access mode
+ * @param maxsize the maximum data size for this property
+ * @param dataSize (may be 0/NULL, independent of data) the size of the initial data
+ * @param data (may be NULL) the initial data.
+ */
+Property_PTR createDataProperty2(uint8_t propcode, uint8_t rwn,
+		storage_spec_e spec, uint8_t maxsize, uint8_t dataSize, char *data);
 
 /** flips the appropriate bit for a property code in a bitmap */
 void flipPropertyBit(uint8_t code, char *pbitmap);

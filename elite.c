@@ -592,6 +592,25 @@ Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 	return property;
 }
 
+Property_PTR createDataProperty2(uint8_t propcode, uint8_t rwn,
+                                 storage_spec_e spec, uint8_t maxsize,
+                                 uint8_t datasize, char *data) {
+
+	Property_PTR property = createDataProperty(propcode, rwn, maxsize, datasize, data);
+	if (!property) {
+		return NULL;
+	}
+
+	//rewire the write function depending on the storage spec
+	//the default is write exact
+	if (spec == STORAGE_UPTO) {
+		property->writef = writeData;
+	} else  {
+		property->writef = writeDataExact;
+	}
+	return property;
+}
+
 /**
  * Flips the corresponding bit in the property bit map.
  *
