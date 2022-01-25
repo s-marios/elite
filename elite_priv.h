@@ -30,5 +30,8 @@ int processRead(ECHOFRAME_PTR incoming, ECHOFRAME_PTR response, OBJ_PTR obj,
 // for internal testing
 int testRead(Property_PTR property, uint8_t size, unsigned char *buf);
 void initTestProperty(Property_PTR property);
+int readData(Property_PTR property, uint8_t size, unsigned char *buf);
+int writeData(Property_PTR property, uint8_t size, const unsigned char *buf);
+int writeDataExact(Property_PTR property, uint8_t size, const unsigned char *buf);
 
 #endif

@@ -2,3 +2,5 @@ build
 firmware
 Documentation
 *.swp
+*.o
+tests/tests
