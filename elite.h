@@ -215,6 +215,7 @@ typedef unsigned char EOJ[3];
  * @return pointer to the echoframe, NULL on failure.
  */
 ECHOFRAME_PTR allocateFrame(size_t alocsize);
+
 /**
  * Use an echoframe pointer to track data as a frame. Allocated bytes is zero.
  * @param frame the frame that will be used to track the data
@@ -240,6 +241,7 @@ ECHOFRAME_PTR initFrame(size_t alocsize, uint16_t TID);
  * @param frame the frame to free.
  */
 void freeFrame(ECHOFRAME_PTR frame);
+
 /**
  * Creates a simple response frame by reversing seoj/deoj of incoming frame.
  *
@@ -256,6 +258,7 @@ ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char *eoj,
  * @return 0 on success, -1 on failure.
  */
 int putByte(ECHOFRAME_PTR fptr, char byte);
+
 /**
  * Put many bytes in an echonet frame.
  *
@@ -596,6 +599,10 @@ Property_PTR createProperty(uint8_t propcode, uint8_t mode);
 Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
 		uint8_t dataSize, char *data);
 
+/**
+ * Explicit storage semantincs when writing a \ref createDataProperty2.
+ * Exact and "up to" max size data.
+ */
 typedef enum storage_spec {
 	STORAGE_EXACT, STORAGE_UPTO
 } storage_spec_e;
@@ -613,8 +620,8 @@ typedef enum storage_spec {
  * @param propcode property code
  * @param rwn access mode
  * @param maxsize the maximum data size for this property
- * @param dataSize (may be 0/NULL, independent of data) the size of the initial data
- * @param data (may be NULL) the initial data.
+ * @param dataSize the size of the initial data (may be 0)
+ * @param data the initial data (may be NULL).
  */
 Property_PTR createDataProperty2(uint8_t propcode, uint8_t rwn,
 		storage_spec_e spec, uint8_t maxsize, uint8_t dataSize, char *data);

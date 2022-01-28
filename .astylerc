@@ -1,1 +1,8 @@
+style=1tbs
 indent=tab
+indent-after-parens
+pad-header
+pad-comma
+break-blocks
+indent-col1-comments
+max-code-length=85
