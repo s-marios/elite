@@ -70,6 +70,16 @@
  * compute the class and instance lists (properties d3, d4, d5, d6, d7) using
  * computeNodeClassInstanceLists()
  *
+ * \subsection setup_properties Setup ECHONET Lite Properties
+ *
+ * Each property is represented by a \ref Property struct. This struct contains
+ * the access mode for this property (read, write, notification), the property
+ * code, the functions that will be invoked when a read/write
+ * operation occurs (readf, writef), as well as an optional data pointer that
+ * can be used to store data.
+ *
+ * Use \ref addProperty to add an initialized property to an object.
+ *
  *
  */
 #ifndef ELITE_H
@@ -409,11 +419,15 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
 #define getEPC(x) &x->data[OFF_EPC]
 
 /**
- * Function type for property read/write operations
- * @return the number of bytes read or written, 0 on failure.
+ * Function type for property write operations
+ * @return the number of bytes written, 0 or negative on failure.
  */
-typedef int (*WRITEFUNC)(Property_PTR property, uint8_t size,
-		const unsigned char *buf);
+typedef int (*WRITEFUNC)(Property_PTR property, uint8_t size, const unsigned char *buf);
+
+/**
+ * Function type for property read operations
+ * @return the number of bytes read, 0 or negative on failure.
+ */
 typedef int (*READFUNC)(Property_PTR property, uint8_t size, unsigned char *buf);
 
 typedef Property_PTR (*FREEFUNC)(Property_PTR property);
@@ -431,12 +445,28 @@ typedef enum {
 
 /**
  * The structure representing a property of an object. New properties can be
- * implemented by creating new READWRITE functions and setting this structure
- * appropriately. This structure can be used with the macrolist functions, with
- * the next field holding the next property of an object.
+ * implemented by creating new \ref READFUNC and \ref WRITEFUNC functions and
+ * assigning them to this structure.
+ *
+ * The property code, access rights must be set. Optionally, the opt pointer may
+ * be used to store any necessary data. A deallocation function may also be
+ * specified.
+ *
+ * This structure can be used with the macrolist functions, with the next field
+ * holding the next property of an object. A pointer to the parent object will
+ * also be initialized after the property has been added to an object. The next
+ * and pObj pointers should not be manipulated directly.
+ *
+ * After this struct has been initialized, add it to an object using
+ * \ref addProperty.
  *
  * @see macrolist.h
  * @see OBJ
+ * @see READFUNC
+ * @see WRITEFUNC
+ * @see E_WRITEMODE
+ * @see addProperty
+ *
  */
 struct Property {
 	void *next; /**< the next property in the list */
@@ -445,7 +475,7 @@ struct Property {
 	FREEFUNC freeptr; /**< custom free function pointer, NULL for standard dealocation*/
 	READFUNC readf; /**< the read function pointer (used for GETs) */
 	WRITEFUNC writef; /**< the write function pointer (used for SETs) */
-	uint8_t propcode; /**< 1byte property code */
+	uint8_t propcode; /**< 1 byte property code */
 	uint8_t rwn_mode; /**< access mode */
 };
 

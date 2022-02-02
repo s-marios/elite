@@ -4,3 +4,4 @@ Documentation
 *.swp
 *.o
 tests/tests
+.ccls-cache
