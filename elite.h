@@ -88,8 +88,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+//including elite.h is enough
 #include "logging.h"
 #include "networking.h"
+#include "macrolist.h"
 
 
 //this is essentially forward declaration for the OBJ struct

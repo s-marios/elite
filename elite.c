@@ -16,10 +16,7 @@
 #include <string.h>
 #include <limits.h>
 
-#include "elite.h"
-
 #include "elite_priv.h"
-#include "macrolist.h"
 
 ECHOFRAME_PTR allocateFrame(size_t alocsize)
 {

@@ -6,7 +6,6 @@
 #ifndef ELITE_PRIV_H
 #define ELITE_PRIV_H
 
-#include <stdint.h>
 #include "elite.h"
 
 void flipPropertyBit(uint8_t code, char * pbitmap);
