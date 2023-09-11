@@ -34,8 +34,7 @@
 
 #ifdef DOWEBLOG
 
-
-extern uint8_t ndsize; /**< last weblog data size */
+extern uint8_t ndsize;  /**< last weblog data size */
 extern char ndbuf[256]; /**< buffer holding the data to be sent */
 /** semaphore protecting simultaneous writes */
 extern SemaphoreHandle_t debugdowrite;
@@ -43,14 +42,15 @@ extern SemaphoreHandle_t debugdowrite;
 extern SemaphoreHandle_t debugsem;
 
 /** the web logging macro, usually mapped to PPRINTF */
-#define WEBLOG(...) do { \
-	if (debugsem) { \
-		xSemaphoreTake(debugdowrite, portMAX_DELAY); \
-		ndsize = sprintf(ndbuf, __VA_ARGS__);	\
-		xSemaphoreGive(debugsem); \
-		xSemaphoreGive(debugdowrite); \
-	}\
-} while (0)
+#define WEBLOG(...)                                      \
+    do {                                                 \
+        if (debugsem) {                                  \
+            xSemaphoreTake(debugdowrite, portMAX_DELAY); \
+            ndsize = sprintf(ndbuf, __VA_ARGS__);        \
+            xSemaphoreGive(debugsem);                    \
+            xSemaphoreGive(debugdowrite);                \
+        }                                                \
+    } while (0)
 
 #else
 #define WEBLOG
@@ -62,7 +62,7 @@ extern SemaphoreHandle_t debugsem;
 #define PRINTF WEBLOG
 #else
 #define PRINTF printf
-#endif	//DOWEBLOG
+#endif //DOWEBLOG
 #endif //ELITE_DEBUG
 #if ELITE_DEBUG > 1
 #undef PPRINTF

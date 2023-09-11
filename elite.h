@@ -85,26 +85,25 @@
 #ifndef ELITE_H
 #define ELITE_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
-//including elite.h is enough
+//including elite.h should be enough for our consumers
 #include "logging.h"
-#include "networking.h"
 #include "macrolist.h"
-
+#include "networking.h"
 
 //this is essentially forward declaration for the OBJ struct
 typedef struct OBJ OBJ;
-typedef struct OBJ *OBJ_PTR;
+typedef struct OBJ * OBJ_PTR;
 
 //this is essentially forward declaration for the property struct
 typedef struct Property Property;
-typedef struct Property *Property_PTR;
+typedef struct Property * Property_PTR;
 
 //this is essentially forward declaration for the handler struct
 typedef struct HANDLER HANDLER;
-typedef struct HANDLER *HANDLER_PTR;
+typedef struct HANDLER * HANDLER_PTR;
 
 /**
  * Definition of the function that processes outgoing frames. This handler
@@ -113,11 +112,11 @@ typedef struct HANDLER *HANDLER_PTR;
  * is the default setup, but it can be substituted with something different
  * for testing purposes.
  */
-typedef void* (*PROCESSORFUNC)(HANDLER_PTR handler, void *outgoing);
+typedef void * (*PROCESSORFUNC)(HANDLER_PTR handler, void * outgoing);
 
 struct HANDLER {
-	PROCESSORFUNC func; /**< The processing function pointer that will be used */
-	void *opt; /**< Optional arguments used by func */
+    PROCESSORFUNC func; /**< Pointer to a processing function */
+    void * opt;         /**< Optional arguments used by func */
 };
 
 /**
@@ -127,20 +126,20 @@ struct HANDLER {
  * things.
  */
 typedef struct {
-	int msock; /**< Multicast socket used for network communications */
-	struct sockaddr_in maddr; /**< ECHONET Lite multicast address */
-	struct sockaddr_in incoming; /**< Holds the address of incoming packets */
+    int msock; /**< Multicast socket used for network communications */
+    struct sockaddr_in maddr;    /**< ECHONET Lite multicast address */
+    struct sockaddr_in incoming; /**< Holds the address of incoming packets */
 
-	uint16_t TID; /**< Transaction ID */
-	OBJ_PTR oHead; /**< Head of the ECHONET Lite Objects list */
-	struct HANDLER sendHandler; /**< Handler for outgoing packets */
+    uint16_t TID;               /**< Transaction ID */
+    OBJ_PTR oHead;              /**< Head of the ECHONET Lite Objects list */
+    struct HANDLER sendHandler; /**< Handler for outgoing packets */
 
 #define ECHOCTRL_BUFSIZE 256
-	/**
-	 * Buffer for incoming packets. Packets received using recv
-	 * will be stored here.
-	 */
-	unsigned char buffer[ECHOCTRL_BUFSIZE];
+    /**
+     * Buffer for incoming packets. Packets received using recv
+     * will be stored here.
+     */
+    unsigned char buffer[ECHOCTRL_BUFSIZE];
 
 } ECHOCTRL, *ECHOCTRL_PTR;
 
@@ -161,10 +160,10 @@ uint16_t incTID(ECHOCTRL_PTR cptr);
  * A structure representing an ECHONET Lite frame.
  */
 typedef struct {
-	size_t used; /**< actual number of bytes currently used */
-	size_t allocated; /**< allocated data bytes */
-	uint8_t propNum; /**< associated property number */
-	unsigned char *data; /**< raw property data */
+    size_t used;          /**< actual number of bytes currently used */
+    size_t allocated;     /**< allocated data bytes */
+    uint8_t propNum;      /**< associated property number */
+    unsigned char * data; /**< raw property data */
 } ECHOFRAME, *ECHOFRAME_PTR;
 
 /** point to the head of the data of an echonet frame */
@@ -185,37 +184,38 @@ typedef struct {
  * enum holding the various ESV services of ECHONET Lite.
  */
 typedef enum {
-	ESV_SETI = 0x60,
-	ESV_SETC = 0x61,
-	ESV_GET = 0x62,
-	ESV_INFREQ = 0x63,
-	ESV_SETGET = 0x6E,
-	ESV_SETRES = 0x71,
-	ESV_GETRES = 0x72,
-	ESV_INF = 0x73,
-	ESV_INFC = 0x74,
-	ESV_INFCRES = 0x7A,
-	ESV_SETGETRES = 0x7E,
-	ESV_SETI_SNA = 0x50,
-	ESV_SETC_SNA = 0x51,
-	ESV_GETC_SNA = 0x52,
-	ESV_INF_SNA = 0x53,
-	ESV_SETGET_SNA = 0x5E
+    ESV_SETI = 0x60,
+    ESV_SETC = 0x61,
+    ESV_GET = 0x62,
+    ESV_INFREQ = 0x63,
+    ESV_SETGET = 0x6E,
+    ESV_SETRES = 0x71,
+    ESV_GETRES = 0x72,
+    ESV_INF = 0x73,
+    ESV_INFC = 0x74,
+    ESV_INFCRES = 0x7A,
+    ESV_SETGETRES = 0x7E,
+    ESV_SETI_SNA = 0x50,
+    ESV_SETC_SNA = 0x51,
+    ESV_GETC_SNA = 0x52,
+    ESV_INF_SNA = 0x53,
+    ESV_SETGET_SNA = 0x5E
 } ESV;
 
 #define E_HD1 0x10
 #define E_HD2 0x81
-
-//offset indexes
-//#define E_ESV_OFFSET 10
-//#define E_OPC_OFFSET 11
 
 typedef unsigned char EOJ[3];
 
 #define SETSUPERCLASS(x, scl) ((x[0]) = (scl))
 #define SETCLASS(x, cl) ((x[1]) = (cl))
 #define SETINSTANCE(x, inst) ((x[2]) = inst)
-#define SETEOJ(x, scl, cl, inst) do { SETSUPERCLASS(x, scl); SETCLASS(x, cl); SETINSTANCE(x, inst); } while (0)
+#define SETEOJ(x, scl, cl, inst) \
+    do {                         \
+        SETSUPERCLASS(x, scl);   \
+        SETCLASS(x, cl);         \
+        SETINSTANCE(x, inst);    \
+    } while (0)
 #define GETSUPERCLASS(x) ((x)[0])
 #define GETCLASS(x) ((x)[1])
 #define GETINSTANCE(x) ((x)[2])
@@ -235,8 +235,8 @@ ECHOFRAME_PTR allocateFrame(size_t alocsize);
  * @param length data length
  * @return the frame supplied, NULL on failure
  */
-ECHOFRAME_PTR wrapDataIntoFrame(ECHOFRAME_PTR frame, unsigned char *data,
-		size_t length);
+ECHOFRAME_PTR
+wrapDataIntoFrame(ECHOFRAME_PTR frame, unsigned char * data, size_t length);
 
 /**
  * Init an echonet frame. Sets up the first two bytes of the header and the TID.
@@ -262,8 +262,8 @@ void freeFrame(ECHOFRAME_PTR frame);
  * @param alocsize data size
  * @return the new response frame, NULL on failure.
  */
-ECHOFRAME_PTR initFrameResponse(ECHOFRAME_PTR incoming, unsigned char *eoj,
-		size_t alocsize);
+ECHOFRAME_PTR
+initFrameResponse(ECHOFRAME_PTR incoming, unsigned char * eoj, size_t alocsize);
 
 /**
  * Put one byte as data in an echonet frame.
@@ -279,7 +279,7 @@ int putByte(ECHOFRAME_PTR fptr, char byte);
  * @param data the actual data
  * @return zero on success, -1 on failure
  */
-int putBytes(ECHOFRAME_PTR fptr, uint8_t num, unsigned char *data);
+int putBytes(ECHOFRAME_PTR fptr, uint8_t num, unsigned char * data);
 
 /** Put a short (two byte integer) in an ECHONET Lite frame.
  *
@@ -327,7 +327,7 @@ int putEOJ(ECHOFRAME_PTR fptr, EOJ eoj);
  * @return zero (see todo).
  * \todo setup error checking.
  */
-int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, unsigned char *data);
+int putEPC(ECHOFRAME_PTR fptr, uint8_t epc, uint8_t size, unsigned char * data);
 
 /**
  * Put the esv and take the space for the operand count at the same time.
@@ -360,23 +360,29 @@ void dumpFrame(ECHOFRAME_PTR fptr);
  * parse result of an echonet frame
  */
 typedef enum {
-	PR_OK = 1, PR_TOOLONG, PR_TOOSHORT, PR_HD, PR_INVESV, PR_OPCZERO, PR_NULL
+    PR_OK = 1,
+    PR_TOOLONG,
+    PR_TOOSHORT,
+    PR_HD,
+    PR_INVESV,
+    PR_OPCZERO,
+    PR_NULL
 } PARSERESULT;
 
 /**
  * offsets into various indexes in a frame
  */
 typedef enum {
-	OFF_EHD1 = 0,
-	OFF_EHD2 = 1,
-	OFF_TID = 2,
-	OFF_SEOJ = 4,
-	OFF_DEOJ = 7,
-	OFF_ESV = 10,
-	OFF_OPC = 11,
-	OFF_EPC = 12,
-	OFF_PDC = 13,
-	OFF_EDT = 14
+    OFF_EHD1 = 0,
+    OFF_EHD2 = 1,
+    OFF_TID = 2,
+    OFF_SEOJ = 4,
+    OFF_DEOJ = 7,
+    OFF_ESV = 10,
+    OFF_OPC = 11,
+    OFF_EPC = 12,
+    OFF_PDC = 13,
+    OFF_EDT = 14
 } OFFSETS;
 
 /**
@@ -393,11 +399,11 @@ PARSERESULT parseFrame(ECHOFRAME_PTR fptr);
  * @see getNextEPC
  */
 typedef struct {
-	uint8_t opc; /**< number of properties */
-	uint8_t propIndex; /**< current property index? */
-	uint8_t epc; /**< current property code */
-	uint8_t pdc; /**< data count */
-	unsigned char *edt; /**< data */
+    uint8_t opc;         /**< number of properties */
+    uint8_t propIndex;   /**< current property index? */
+    uint8_t epc;         /**< current property code */
+    uint8_t pdc;         /**< data count */
+    unsigned char * edt; /**< data */
 } PARSE_EPC, *PARSE_EPC_PTR;
 
 /**
@@ -424,13 +430,15 @@ int getNextEPC(ECHOFRAME_PTR fptr, PARSE_EPC_PTR epc);
  * Function type for property write operations
  * @return the number of bytes written, 0 or negative on failure.
  */
-typedef int (*WRITEFUNC)(Property_PTR property, uint8_t size, const unsigned char *buf);
+typedef int (*WRITEFUNC)(
+    Property_PTR property, uint8_t size, const unsigned char * buf);
 
 /**
  * Function type for property read operations
  * @return the number of bytes read, 0 or negative on failure.
  */
-typedef int (*READFUNC)(Property_PTR property, uint8_t size, unsigned char *buf);
+typedef int (*READFUNC)(
+    Property_PTR property, uint8_t size, unsigned char * buf);
 
 typedef Property_PTR (*FREEFUNC)(Property_PTR property);
 /** not sure I use this any more*/
@@ -442,7 +450,10 @@ typedef Property_PTR (*FREEFUNC)(Property_PTR property);
  * property that notifies.
  */
 typedef enum {
-	E_READ = 1, E_WRITE = 2, E_NOTIFY = 4, E_SUPPRESS_NOTIFY = 8,
+    E_READ = 1,
+    E_WRITE = 2,
+    E_NOTIFY = 4,
+    E_SUPPRESS_NOTIFY = 8,
 } E_WRITEMODE;
 
 /**
@@ -471,14 +482,14 @@ typedef enum {
  *
  */
 struct Property {
-	void *next; /**< the next property in the list */
-	void *opt; /**< optional data pointer used by this property */
-	OBJ_PTR pObj; /**< pointer to the echonet object that this property is part of*/
-	FREEFUNC freeptr; /**< custom free function pointer, NULL for standard dealocation*/
-	READFUNC readf; /**< the read function pointer (used for GETs) */
-	WRITEFUNC writef; /**< the write function pointer (used for SETs) */
-	uint8_t propcode; /**< 1 byte property code */
-	uint8_t rwn_mode; /**< access mode */
+    void * next;      /**< the next property in the list */
+    void * opt;       /**< optional data pointer used by this property */
+    OBJ_PTR pObj;     /**< pointer to the parent echonet object */
+    FREEFUNC freeptr; /**< deallocator, use NULL for standard free*/
+    READFUNC readf;   /**< the read function pointer, used for GETs */
+    WRITEFUNC writef; /**< the write function pointer, used for SETs */
+    uint8_t propcode; /**< 1 byte property code */
+    uint8_t rwn_mode; /**< access mode */
 };
 
 #define classgroup eoj[0]
@@ -493,11 +504,11 @@ struct Property {
  * object of the node.
  */
 struct OBJ {
-	void *next; /**< the next object in the node */
-	int i; /*!< this was used for tests \todo remove */
-	Property_PTR pHead; /**< the head of the property list of this object */
-	uint8_t eoj[3]; /**< EOJ */
-	ECHOCTRL_PTR ectrl; /**< echonet control context pointer */
+    void * next;        /**< the next object in the node */
+    int i;              /*!< this was used for tests \todo remove */
+    Property_PTR pHead; /**< the head of the property list of this object */
+    uint8_t eoj[3];     /**< EOJ */
+    ECHOCTRL_PTR ectrl; /**< echonet control context pointer */
 };
 
 /**
@@ -510,7 +521,7 @@ void freeObject(OBJ_PTR obj);
  * @param eoj the eoj of the object to create
  * @return a pointer to the object, NULL on failure.
  */
-OBJ_PTR createObject(char *eoj);
+OBJ_PTR createObject(char * eoj);
 
 /**
  * Register an object with the ECHONET Lite context. Use this during the
@@ -524,11 +535,12 @@ void addObject(ECHOCTRL_PTR ectrl, OBJ_PTR obj);
 #define setClassGroup(obj_ptr, val) (obj_ptr)->classgroup = val
 #define setClass(obj_ptr, val) (obj_ptr)->class = val
 #define setInstance(obj_ptr, val) (obj_ptr)->instance = val
-#define setEOJ(obj_ptr, eoj)	do { \
-	if (obj_ptr && eoj) { \
-		memcpy(obj_ptr->eoj, eoj, 3); \
-	} \
-} while (0)
+#define setEOJ(obj_ptr, eoj)              \
+    do {                                  \
+        if (obj_ptr && eoj) {             \
+            memcpy(obj_ptr->eoj, eoj, 3); \
+        }                                 \
+    } while (0)
 
 /**
  * Adds a property to an object. If a property with the same property code
@@ -561,7 +573,7 @@ void sendNotification(ECHOCTRL_PTR context, ECHOFRAME_PTR outgoing);
  *
  * @return number of bytes read, 0 or negative on failure.
  */
-int readProperty(Property_PTR property, uint8_t size, unsigned char *buf);
+int readProperty(Property_PTR property, uint8_t size, unsigned char * buf);
 
 /**
  * Write (SET) a property with the given data
@@ -572,7 +584,8 @@ int readProperty(Property_PTR property, uint8_t size, unsigned char *buf);
  *
  * @return number of bytes written, 0 or negative on failure
  */
-int writeProperty(Property_PTR property, uint8_t size, const unsigned char *buf);
+int writeProperty(
+    Property_PTR property, uint8_t size, const unsigned char * buf);
 
 /**
  * Find a property with a specific code in an object.
@@ -596,7 +609,10 @@ Property_PTR getProperty(OBJ_PTR obj, uint8_t code);
 Property_PTR freeProperty(Property_PTR property);
 
 /** use this to free a list of proeprties. Rare. */
-#define FREEPROPERTIES(head) while(head){head = freeProperty(head);}
+#define FREEPROPERTIES(head)       \
+    while (head) {                 \
+        head = freeProperty(head); \
+    }
 
 /**
  * Create a property.
@@ -628,15 +644,17 @@ Property_PTR createProperty(uint8_t propcode, uint8_t mode);
  * @param dataSize (may be 0/NULL, independent of data) the size of the initial data
  * @param data (may be NULL) the initial data.
  */
-Property_PTR createDataProperty(uint8_t propcode, uint8_t rwn, uint8_t maxsize,
-		uint8_t dataSize, char *data);
+Property_PTR createDataProperty(
+    uint8_t propcode, uint8_t rwn, uint8_t maxsize, uint8_t dataSize,
+    char * data);
 
 /**
  * Explicit storage semantincs when writing a \ref createDataProperty2.
  * Exact and "up to" max size data.
  */
 typedef enum storage_spec {
-	STORAGE_EXACT, STORAGE_UPTO
+    STORAGE_EXACT,
+    STORAGE_UPTO
 } storage_spec_e;
 
 /**
@@ -655,11 +673,12 @@ typedef enum storage_spec {
  * @param dataSize the size of the initial data (may be 0)
  * @param data the initial data (may be NULL).
  */
-Property_PTR createDataProperty2(uint8_t propcode, uint8_t rwn,
-		storage_spec_e spec, uint8_t maxsize, uint8_t dataSize, char *data);
+Property_PTR createDataProperty2(
+    uint8_t propcode, uint8_t rwn, storage_spec_e spec, uint8_t maxsize,
+    uint8_t dataSize, char * data);
 
 /** flips the appropriate bit for a property code in a bitmap */
-void flipPropertyBit(uint8_t code, char *pbitmap);
+void flipPropertyBit(uint8_t code, char * pbitmap);
 
 /**
  * This function computes the property maps for this object and
@@ -675,7 +694,7 @@ int computePropertyMaps(OBJ_PTR obj);
  * @param eoj the eoj of the object to create
  * @return the pointer to the newly created object, NULL on failure.
  */
-OBJ_PTR createBasicObject(char *eoj);
+OBJ_PTR createBasicObject(char * eoj);
 
 /** profile EOJ static definition */
 #define PROFILEEOJ "\x0E\xF0\x01"
@@ -699,7 +718,7 @@ void computeNodeClassInstanceLists(OBJ_PTR oHead);
  * @param eoj the eoj to search for
  * @return a pointer to the object found, NULL otherwise.
  */
-OBJ_PTR getObject(OBJ_PTR oHead, char *eoj);
+OBJ_PTR getObject(OBJ_PTR oHead, char * eoj);
 
 /**
  * Macro for getting an object by passing in the elite control structure directly
@@ -723,9 +742,9 @@ OBJ_PTR getObject(OBJ_PTR oHead, char *eoj);
  * @see matchObjects
  */
 typedef struct {
-	OBJ_PTR lastmatch;
-	OBJ_PTR oHead;
-	unsigned char *eoj;
+    OBJ_PTR lastmatch;
+    OBJ_PTR oHead;
+    unsigned char * eoj;
 } OBJMATCH, *OBJMATCH_PTR;
 
 /**

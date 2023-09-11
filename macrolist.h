@@ -14,7 +14,7 @@
  * void * next, so all future casts can succeed.
  */
 typedef struct {
-	void * next;
+    void * next;
 } ELEMENT, *ELEMENT_PTR;
 
 /**
@@ -25,10 +25,11 @@ typedef struct {
 /**
  * Forward towards the next list element.
  */
-#define LNEXT(elem) LHASNEXT(elem); 		\
-	do { 									\
-		elem = elem->next; 					\
-	} while (0)
+#define LNEXT(elem)        \
+    LHASNEXT(elem);        \
+    do {                   \
+        elem = elem->next; \
+    } while (0)
 
 /**
  * typedef for a comparison operator for two elements on a list
@@ -39,7 +40,9 @@ typedef int (*comparator)(void *, void *);
  * 'For Each' loop construct. Used to access elements only as #ELEMENT_PTR s
  * thus not very useful apart from counting the number of objects in a list.
  */
-#define FOREACHPURE(head) for (ELEMENT_PTR element = (ELEMENT_PTR) head; element; element = element->next)
+#define FOREACHPURE(head)                                   \
+    for (ELEMENT_PTR element = (ELEMENT_PTR) head; element; \
+         element = element->next)
 /**
  * Use this to loop the list, casting each element to a type of "type". For example
  * FOREACH(oHead, OBJ_PTR) {
@@ -49,11 +52,14 @@ typedef int (*comparator)(void *, void *);
  * is a loop that casts all the elements to type OBJ_PTR. The current element in
  * the loop is accessible through the variable 'element'.
  */
-#define FOREACH(head, type) for (type element = head; element; element = (type) ((ELEMENT_PTR) element)->next)
+#define FOREACH(head, type)            \
+    for (type element = head; element; \
+         element = (type) ((ELEMENT_PTR) element)->next)
 /**
  * same as #FOREACH but make the accessible element available under the variable 'name'
  */
-#define FOREACHWITH(head, type, name) for (type name = head; name; name = (type) (ELEMENT_PTR) name->next)
+#define FOREACHWITH(head, type, name) \
+    for (type name = head; name; name = (type) (ELEMENT_PTR) name->next)
 
 /**
  * Find an element in a list. The search criteria is usually another struct
