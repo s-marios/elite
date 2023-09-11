@@ -66,7 +66,7 @@ ECHOCTRL_PTR createEchonetControl() {
     ecptr->TID = 1;
     //settign up multicast address
     //the socket is not setup here!
-#ifdef __unix
+#if defined __unix || defined ESP_PLATFORM
 
     if (inet_aton(ELITE_MADDR, &ecptr->maddr.sin_addr) == 0) {
         PRINTF("SHOULD NOT HAPPEN: failed to convert ip");
@@ -1113,7 +1113,7 @@ ECHOFRAME_PTR getPerObjectResponse(ECHOFRAME_PTR incoming, OBJ_PTR obj) {
         case ESV_SETC: //intentional fall through.
             res = initFrameResponse(incoming, obj->eoj, ECHOFRAME_MAXSIZE);
 
-        //intentional!
+        // fall through
         case ESV_SETI:
             processWrite(incoming, res, obj);
             break;

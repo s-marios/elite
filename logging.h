@@ -14,11 +14,17 @@
 #define PPRINTF printf
 #endif
 
+#elif ESP_PLATFORM
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#endif
+
 #else
 // Microcontroller environment, hard requirements
 // is FreeRTOS with semaphores
 #include "FreeRTOS.h"
 #include "semphr.h"
+#endif
 
 /**
  * Debug printfs. Debug level of 0 (zero) suppresses all output. Debug level of
@@ -75,7 +81,4 @@ extern SemaphoreHandle_t debugsem;
 
 #ifndef PRINTF
 #define PRINTF printf
-#endif
-
-#endif
 #endif

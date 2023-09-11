@@ -3,6 +3,7 @@
 
 //common definitions here
 #define ELITE_PORT 3610
+#define ELITE_MADDR "224.0.23.0"
 
 #ifdef __unix
 //unix/linux stuff here
@@ -12,8 +13,6 @@
 #include <netinet/ip.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-
-#define ELITE_MADDR "224.0.23.0"
 
 #else
 //microcontroller stuff here
